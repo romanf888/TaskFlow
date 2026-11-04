@@ -17,11 +17,11 @@
       padding: 20px;
     }
     .card {
-      background: rgba(22, 26, 43, 0.9);
+      background: rgba(22, 26, 43, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 20px;
       padding: 36px 32px;
-      max-width: 440px;
+      max-width: 480px;
       width: 100%;
       text-align: center;
       box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(59, 130, 246, 0.15);
@@ -50,7 +50,7 @@
       color: #94a3b8;
       font-size: 13px;
       line-height: 1.6;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
     .btn-google {
       width: 100%;
@@ -74,22 +74,39 @@
       transform: translateY(-1px);
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
     }
-    .btn-google:active {
-      transform: translateY(0);
-    }
     .btn-google:disabled {
       opacity: 0.6;
       cursor: not-allowed;
     }
+    .btn-secondary {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+      font-weight: 500;
+      font-size: 13px;
+      padding: 11px 18px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
     .success-box {
       display: none;
-      padding: 20px;
+      padding: 24px;
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.3);
-      border-radius: 12px;
+      border-radius: 14px;
       color: #34d399;
       font-size: 14px;
-      margin-top: 10px;
+      text-align: center;
     }
     .error-box {
       display: none;
@@ -102,6 +119,39 @@
       margin-top: 16px;
       text-align: left;
     }
+    .code-box {
+      margin-top: 16px;
+      padding: 12px;
+      background: #0f121d;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      text-align: left;
+    }
+    .code-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-family: monospace;
+      font-size: 11px;
+      word-break: break-all;
+      outline: none;
+    }
+    .btn-copy {
+      margin-top: 8px;
+      width: 100%;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-copy:hover {
+      background: #2563eb;
+    }
     .spinner {
       display: inline-block;
       width: 18px;
@@ -111,9 +161,7 @@
       border-top-color: #1e293b;
       animation: spin 0.8s linear infinite;
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .footer-note {
       font-size: 11px;
       color: #64748b;
@@ -125,12 +173,12 @@
   <div class="card">
     <div class="badge">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-      TaskFlow Windows - Authentification
+      TaskFlow Windows - Cloud Auth
     </div>
 
     <div id="login-view">
       <h1>Connexion Google</h1>
-      <p>Connectez votre compte Google dans votre navigateur officiel. Vos tâches et tableaux seront synchronisés instantanément sur votre application Windows.</p>
+      <p>Cliquez ci-dessous pour vous connecter avec votre compte Google. Vos tâches et documents seront synchronisés avec TaskFlow sur votre PC.</p>
 
       <button id="login-btn" class="btn-google">
         <svg width="18" height="18" viewBox="0 0 24 24">
@@ -139,39 +187,52 @@
           <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
         </svg>
-        <span id="btn-text">Se connecter avec mon compte Google</span>
+        <span id="btn-text">Se connecter avec Google</span>
+      </button>
+
+      <button id="redirect-btn" class="btn-secondary" style="display: none;">
+        <span>Ouvrir sans pop-up (Redirection directe)</span>
       </button>
 
       <div id="error-box" class="error-box"></div>
-      <div class="footer-note">Cette page communique en toute sécurité avec votre application locale TaskFlow.</div>
+      <div class="footer-note">Authentification sécurisée officielle Firebase Google.</div>
     </div>
 
     <div id="success-view" class="success-box">
       <div style="font-size: 32px; margin-bottom: 10px;">🎉</div>
-      <strong style="display: block; font-size: 16px; margin-bottom: 6px;">Connexion réussie !</strong>
+      <strong style="display: block; font-size: 16px; margin-bottom: 6px;">Connexion validée !</strong>
       <div id="user-email-display" style="color: #a7f3d0; margin-bottom: 12px; font-size: 13px;"></div>
-      <p style="color: #94a3b8; font-size: 12px; margin-bottom: 0;">Vous pouvez fermer cet onglet et retourner sur l'application <strong>TaskFlow Windows</strong>.</p>
+      <p id="auto-msg" style="color: #94a3b8; font-size: 12px; margin-bottom: 10px;">
+        Transmission automatique vers TaskFlow Windows en cours...
+      </p>
+
+      <div class="code-box">
+        <div style="font-size: 11px; color: #cbd5e1; margin-bottom: 6px;">Code de session rapide :</div>
+        <input id="session-code" class="code-input" readonly />
+        <button id="copy-btn" class="btn-copy">📋 Copier le code de session</button>
+      </div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 10px;">
+        (Si votre application ne s'est pas connectée automatiquement, collez ce code dans la fenêtre de connexion de TaskFlow).
+      </div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { 
+      getAuth, 
+      signInWithPopup, 
+      signInWithRedirect, 
+      getRedirectResult, 
+      GoogleAuthProvider 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    let firebaseConfig = {
+    const firebaseConfig = {
       apiKey: "AIzaSyBpWKftClA4EUhs-pIjUzf1iSV3EvJW6w0",
       authDomain: "loyal-science-0szp9.firebaseapp.com",
       projectId: "loyal-science-0szp9",
       appId: "1:589770041043:web:771f73fc30668054349626"
     };
-
-    try {
-      const res = await fetch('/api/firebase-config');
-      if (res.ok) {
-        const loaded = await res.json();
-        firebaseConfig = { ...firebaseConfig, ...loaded };
-      }
-    } catch (e) {}
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -179,57 +240,117 @@
     provider.setCustomParameters({ prompt: 'select_account' });
 
     const loginBtn = document.getElementById('login-btn');
+    const redirectBtn = document.getElementById('redirect-btn');
     const btnText = document.getElementById('btn-text');
     const errorBox = document.getElementById('error-box');
     const loginView = document.getElementById('login-view');
     const successView = document.getElementById('success-view');
     const userEmailDisplay = document.getElementById('user-email-display');
+    const autoMsg = document.getElementById('auto-msg');
+    const sessionCodeInput = document.getElementById('session-code');
+    const copyBtn = document.getElementById('copy-btn');
 
-    async function handleLogin() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const port = urlParams.get('port') || '38241';
+
+    async function handleAuthSuccess(result) {
+      loginView.style.display = 'none';
+      successView.style.display = 'block';
+      userEmailDisplay.textContent = 'Connecté sous : ' + (result.user.email || '');
+
+      let credential;
+      try {
+        credential = GoogleAuthProvider.credentialFromResult(result);
+      } catch (e) {}
+
+      const idToken = credential?.idToken || (await result.user.getIdToken());
+      const accessToken = credential?.accessToken || '';
+
+      const payload = {
+        idToken,
+        accessToken,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoURL: result.user.photoURL,
+        uid: result.user.uid
+      };
+
+      // Base64 token for manual paste fallback
+      const tokenString = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      sessionCodeInput.value = tokenString;
+
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(tokenString);
+        copyBtn.textContent = '✅ Code copié ! Collez-le dans TaskFlow';
+      });
+
+      // Try automatic transmission to local Electron server
+      let transmitted = false;
+      const targets = [
+        `http://127.0.0.1:${port}/api/auth-callback`,
+        `http://localhost:${port}/api/auth-callback`
+      ];
+
+      for (const target of targets) {
+        try {
+          const res = await fetch(target, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok) {
+            transmitted = true;
+            break;
+          }
+        } catch (err) {}
+      }
+
+      if (transmitted) {
+        autoMsg.textContent = '✅ Transmis avec succès à TaskFlow Windows ! Vous pouvez fermer cet onglet.';
+        autoMsg.style.color = '#34d399';
+        setTimeout(() => {
+          try { window.close(); } catch {}
+        }, 2500);
+      } else {
+        autoMsg.textContent = 'Session prête ! Cliquez sur le bouton bleu ci-dessous pour copier votre code et collez-le dans TaskFlow :';
+      }
+    }
+
+    // Check if coming back from redirect
+    getRedirectResult(auth).then((result) => {
+      if (result && result.user) {
+        handleAuthSuccess(result);
+      }
+    }).catch((err) => {
+      console.error(err);
+    });
+
+    // Direct Popup Login on User Click (No popup blocking!)
+    loginBtn.addEventListener('click', async () => {
       loginBtn.disabled = true;
       btnText.innerHTML = '<span class="spinner"></span> Connexion en cours...';
       errorBox.style.display = 'none';
 
       try {
         const result = await signInWithPopup(auth, provider);
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const idToken = credential?.idToken || (await result.user.getIdToken());
-        const accessToken = credential?.accessToken || '';
-
-        // Notify local Electron app
-        await fetch('/api/auth-callback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            idToken,
-            accessToken,
-            email: result.user.email,
-            displayName: result.user.displayName,
-            photoURL: result.user.photoURL,
-            uid: result.user.uid
-          })
-        });
-
-        loginView.style.display = 'none';
-        successView.style.display = 'block';
-        userEmailDisplay.textContent = 'Connecté sous : ' + (result.user.email || '');
-
-        setTimeout(() => {
-          try { window.close(); } catch {}
-        }, 3000);
+        await handleAuthSuccess(result);
       } catch (err) {
         console.error(err);
         loginBtn.disabled = false;
         btnText.textContent = 'Réessayer avec Google';
         errorBox.textContent = 'Erreur : ' + (err.message || 'La connexion a été interrompue.');
         errorBox.style.display = 'block';
+
+        if (err.code === 'auth/popup-blocked') {
+          redirectBtn.style.display = 'flex';
+          errorBox.textContent = 'Votre navigateur bloque les popups. Cliquez ci-dessous pour vous connecter sans popup :';
+        }
       }
-    }
+    });
 
-    loginBtn.addEventListener('click', handleLogin);
-
-    // Auto-trigger on page load
-    setTimeout(handleLogin, 500);
+    redirectBtn.addEventListener('click', () => {
+      signInWithRedirect(auth, provider);
+    });
   </script>
 </body>
 </html>

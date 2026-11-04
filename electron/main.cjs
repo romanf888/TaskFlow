@@ -56,6 +56,7 @@ function startLocalServer(distDir) {
             res.writeHead(200, {
               'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Private-Network': 'true',
             });
             res.end(JSON.stringify({ success: true }));
           } catch (err) {
@@ -71,7 +72,8 @@ function startLocalServer(distDir) {
         res.writeHead(204, {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, Access-Control-Request-Private-Network',
+          'Access-Control-Allow-Private-Network': 'true',
         });
         res.end();
         return;
@@ -228,12 +230,10 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('open-external-browser-auth', () => {
-  if (currentServerPort) {
-    const authUrl = `http://localhost:${currentServerPort}/login-browser.html`;
-    shell.openExternal(authUrl);
-    return true;
-  }
-  return false;
+  // Use the authorized HTTPS Cloud Run domain so Firebase Auth never returns auth/unauthorized-domain
+  const cloudAuthUrl = `https://ais-pre-ft3yfwzvu6boe6sepjujgd-256661688582.europe-west2.run.app/login-browser.html?port=${currentServerPort}`;
+  shell.openExternal(cloudAuthUrl);
+  return true;
 });
 
 ipcMain.handle('check-for-updates', async () => {

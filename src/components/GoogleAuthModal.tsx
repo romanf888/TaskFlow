@@ -17,6 +17,7 @@ import {
   Globe
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
+import { loginWithGoogleCredential } from '../firebase';
 
 interface GoogleAuthModalProps {
   onClose: () => void;
@@ -34,12 +35,33 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ onClose }) => 
 
   const [authMode, setAuthMode] = useState<'browser' | 'email' | 'direct'>('browser');
   const [waitingBrowser, setWaitingBrowser] = useState(false);
+  const [manualToken, setManualToken] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('romanferriere4@gmail.com');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('Roman Ferriere');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleManualTokenSubmit = async () => {
+    if (!manualToken.trim()) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const decoded = decodeURIComponent(escape(atob(manualToken.trim())));
+      const data = JSON.parse(decoded);
+      if (data?.idToken) {
+        await loginWithGoogleCredential(data.idToken, data.accessToken);
+        onClose();
+      } else {
+        throw new Error('Jeton de session incomplet');
+      }
+    } catch (e: any) {
+      setError('Code de session invalide. Veuillez vérifier le code copié.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBrowserLogin = async () => {
     setError(null);
@@ -268,6 +290,30 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ onClose }) => 
                       <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                     </button>
                   )}
+
+                  {/* Manual session token input if browser direct callback is blocked */}
+                  <div className="pt-2.5 border-t border-white/10 mt-1 space-y-1.5">
+                    <span className="text-[11px] text-slate-400 block font-medium">
+                      Ou collez votre code de session :
+                    </span>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={manualToken}
+                        onChange={(e) => setManualToken(e.target.value)}
+                        placeholder="Coller le code copié depuis le navigateur..."
+                        className="flex-1 bg-[#0f121d] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleManualTokenSubmit}
+                        disabled={loading || !manualToken.trim()}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold rounded-lg text-xs transition-colors cursor-pointer"
+                      >
+                        Valider
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 /* Email / Password Mode */

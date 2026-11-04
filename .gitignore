@@ -9,11 +9,3 @@ coverage/
 *.log
 .env*
 !.env.example
-
-.vs/
-release/
-*.vsidx
-
-.vs/
-release/
-*.vsidx
