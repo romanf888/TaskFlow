@@ -85,7 +85,12 @@ function startLocalServer(distDir) {
 
       let filePath = path.join(distDir, reqPath);
       if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-        filePath = path.join(distDir, 'index.html');
+        const publicFallback = path.join(__dirname, '../public', reqPath);
+        if (fs.existsSync(publicFallback) && !fs.statSync(publicFallback).isDirectory()) {
+          filePath = publicFallback;
+        } else {
+          filePath = path.join(distDir, 'index.html');
+        }
       }
 
       const ext = path.extname(filePath).toLowerCase();
@@ -230,9 +235,8 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('open-external-browser-auth', () => {
-  // Use the authorized HTTPS Cloud Run domain so Firebase Auth never returns auth/unauthorized-domain
-  const cloudAuthUrl = `https://ais-pre-ft3yfwzvu6boe6sepjujgd-256661688582.europe-west2.run.app/login-browser.html?port=${currentServerPort}`;
-  shell.openExternal(cloudAuthUrl);
+  const localAuthUrl = `http://localhost:${currentServerPort}/login-browser.html?port=${currentServerPort}`;
+  shell.openExternal(localAuthUrl);
   return true;
 });
 

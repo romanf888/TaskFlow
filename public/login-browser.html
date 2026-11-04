@@ -337,13 +337,21 @@
       } catch (err) {
         console.error(err);
         loginBtn.disabled = false;
-        btnText.textContent = 'Réessayer avec Google';
-        errorBox.textContent = 'Erreur : ' + (err.message || 'La connexion a été interrompue.');
-        errorBox.style.display = 'block';
-
-        if (err.code === 'auth/popup-blocked') {
+        if (err.code === 'auth/unauthorized-domain') {
+          errorBox.innerHTML = `
+            <strong>Domaine non autorisé dans Firebase :</strong><br/>
+            Le domaine <code>localhost</code> doit être autorisé dans votre console Firebase.<br/><br/>
+            👉 <a href="https://console.firebase.google.com/project/loyal-science-0szp9/authentication/settings" target="_blank" style="color: #60a5fa; text-decoration: underline; font-weight: bold;">Cliquez ici pour ouvrir la console Firebase</a> &rarr; Onglet <em>Paramètres</em> &rarr; <em>Domaines autorisés</em> &rarr; <strong>Ajouter un domaine : <code>localhost</code></strong>.<br/><br/>
+            <em>Ou connectez-vous directement avec <strong>Email & Mot de passe</strong> dans TaskFlow (sans aucune configuration).</em>
+          `;
+          errorBox.style.display = 'block';
+        } else if (err.code === 'auth/popup-blocked') {
           redirectBtn.style.display = 'flex';
           errorBox.textContent = 'Votre navigateur bloque les popups. Cliquez ci-dessous pour vous connecter sans popup :';
+          errorBox.style.display = 'block';
+        } else {
+          errorBox.textContent = 'Erreur : ' + (err.message || 'La connexion a été interrompue.');
+          errorBox.style.display = 'block';
         }
       }
     });
