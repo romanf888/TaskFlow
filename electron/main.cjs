@@ -278,6 +278,14 @@ ipcMain.handle('open-external-browser-auth', () => {
   return true;
 });
 
+ipcMain.handle('open-external-url', (event, url) => {
+  if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+    shell.openExternal(url);
+    return true;
+  }
+  return false;
+});
+
 ipcMain.handle('check-for-updates', async () => {
   try {
     const { autoUpdater } = require('electron-updater');

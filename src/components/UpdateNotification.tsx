@@ -16,6 +16,7 @@ declare global {
       quitAndInstallUpdate: () => Promise<void>;
       getAppVersion: () => Promise<string>;
       openExternalBrowserAuth?: () => Promise<boolean>;
+      openExternalUrl?: (url: string) => Promise<boolean>;
       clearAppCache?: () => Promise<any>;
       minimizeWindow?: () => void;
       maximizeWindow?: () => void;

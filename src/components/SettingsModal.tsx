@@ -15,7 +15,10 @@ import {
   ExternalLink, 
   Trash2, 
   RefreshCw,
-  Info
+  Info,
+  History,
+  ArrowDownCircle,
+  Tag
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 import { useSettings, THEME_COLOR_MAP, ThemeColor, BorderRadiusStyle, DisplayDensity, DefaultSort } from '../context/SettingsContext';
@@ -37,6 +40,22 @@ interface UpdaterStatusState {
   error?: string;
 }
 
+interface GitHubReleaseAsset {
+  name: string;
+  browser_download_url: string;
+  size: number;
+}
+
+interface GitHubRelease {
+  id: number;
+  tag_name: string;
+  name: string;
+  body: string;
+  published_at: string;
+  html_url: string;
+  assets: GitHubReleaseAsset[];
+}
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({ 
   onClose, 
   onOpenAuthModal 
@@ -46,7 +65,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
   const [activeTab, setActiveTab] = useState<'appearance' | 'tasks' | 'sync' | 'storage' | 'updates'>('appearance');
-  const [appVersion, setAppVersion] = useState('1.0.9');
+  const [appVersion, setAppVersion] = useState('1.0.9.1');
   const [updaterState, setUpdaterState] = useState<UpdaterStatusState>({ status: 'idle' });
   const [isChecking, setIsChecking] = useState(false);
 
@@ -54,6 +73,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [cacheSizeBytes, setCacheSizeBytes] = useState<number>(0);
   const [clearingCache, setClearingCache] = useState<boolean>(false);
   const [cacheClearedMessage, setCacheClearedMessage] = useState<string | null>(null);
+
+  // GitHub Releases (Rollback & Downgrade) states
+  const [githubReleases, setGithubReleases] = useState<GitHubRelease[]>([]);
+  const [loadingReleases, setLoadingReleases] = useState<boolean>(false);
+  const [releasesError, setReleasesError] = useState<string | null>(null);
+
+  const fetchGitHubReleases = async () => {
+    setLoadingReleases(true);
+    setReleasesError(null);
+    try {
+      const res = await fetch('https://api.github.com/repos/romanf888/TaskFlow/releases');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: GitHubRelease[] = await res.json();
+      setGithubReleases(data);
+    } catch (err: any) {
+      console.error('Error fetching GitHub releases', err);
+      setReleasesError('Impossible de charger la liste des releases GitHub.');
+    } finally {
+      setLoadingReleases(false);
+    }
+  };
+
+  const handleOpenExternalUrl = (url: string) => {
+    if ((window as any).electronAPI?.openExternalUrl) {
+      (window as any).electronAPI.openExternalUrl(url);
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   const calculateStorageSize = async () => {
     let bytes = 0;
@@ -82,6 +130,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     calculateStorageSize();
+    fetchGitHubReleases();
 
     if (window.electronAPI?.getAppVersion) {
       window.electronAPI.getAppVersion().then((v) => {
@@ -181,7 +230,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-2xl bg-[#1e1f20] border border-white/15 ${modalRounded} shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh]`}
+        className={`w-full max-w-4xl w-[92vw] h-[85vh] max-h-[850px] bg-[#1e1f20] border border-white/15 ${modalRounded} shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -567,22 +616,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* TAB 5: DESKTOP UPDATES (ELECTRON ONLY) */}
           {activeTab === 'updates' && isElectron && (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              {/* Automated Updater Card */}
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-white text-sm flex items-center space-x-2">
                       <RotateCw className={`w-4 h-4 text-[#8ab4f8] ${isChecking ? 'animate-spin' : ''}`} />
-                      <span>Mises à jour du logiciel (.exe)</span>
+                      <span>Mises à jour automatiques (.exe)</span>
                     </h4>
                     <p className="text-slate-400 text-[11px]">
-                      Version installée sur cet ordinateur : <strong className="text-white">v{appVersion}</strong>
+                      Version actuellement exécutée : <strong className="text-white font-mono bg-black/40 px-2 py-0.5 rounded border border-white/10">v{appVersion}</strong>
                     </p>
                   </div>
                   <button
                     onClick={handleCheckForUpdates}
                     disabled={isChecking}
-                    className="px-4 py-2 rounded-full text-xs font-semibold bg-[#4285F4] hover:bg-[#3367d6] disabled:opacity-50 text-white transition-all cursor-pointer flex items-center space-x-1.5"
+                    className="px-4 py-2 rounded-full text-xs font-semibold bg-[#4285F4] hover:bg-[#3367d6] disabled:opacity-50 text-white transition-all cursor-pointer flex items-center space-x-1.5 shadow-md shadow-blue-500/20"
                   >
                     {isChecking ? (
                       <>
@@ -596,6 +646,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </>
                     )}
                   </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-1">
+                    <span className="text-xs font-bold text-blue-300 flex items-center space-x-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                      <span>Mises à Jour Majeures (ex: 1.1.0)</span>
+                    </span>
+                    <p className="text-[10.5px] text-slate-300">
+                      Générées lors de l'ajout de nouvelles fonctionnalités et modules majeurs.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-1">
+                    <span className="text-xs font-bold text-purple-300 flex items-center space-x-1.5">
+                      <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                      <span>Mises à Jour Mineures (ex: 1.0.9.1)</span>
+                    </span>
+                    <p className="text-[10.5px] text-slate-300">
+                      Générées systématiquement pour les corrections de bugs et ajustements rapides.
+                    </p>
+                  </div>
                 </div>
 
                 {updaterState.status === 'not-available' && (
@@ -632,6 +704,145 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     >
                       Redémarrer et Installer
                     </button>
+                  </div>
+                )}
+              </div>
+
+              {/* GitHub Releases & Downgrade / Rollback Card */}
+              <div className="bg-[#282a2d] p-4.5 rounded-2xl border border-white/10 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-2 rounded-full bg-[#FBBC04]/20 text-[#FBBC04]">
+                      <History className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white text-sm">
+                        Historique des Releases & Option de Rétrogradation (Rollback)
+                      </h4>
+                      <p className="text-slate-400 text-[11px]">
+                        Téléchargez et installez une version antérieure (.exe) en cas de besoin
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={fetchGitHubReleases}
+                    disabled={loadingReleases}
+                    className="p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    title="Actualiser la liste des versions GitHub"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingReleases ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-slate-300 leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">
+                  Si vous rencontrez un problème avec la version actuelle, vous pouvez rétrograder vers une version précédente. Cliquez sur le bouton d'installation de la version souhaitée pour télécharger l'installateur <strong>.exe</strong> officiel hébergé sur GitHub Releases.
+                </p>
+
+                {loadingReleases && (
+                  <div className="py-6 text-center text-slate-400 text-xs flex items-center justify-center space-x-2">
+                    <RotateCw className="w-4 h-4 animate-spin text-[#4285F4]" />
+                    <span>Chargement de l'historique des releases GitHub...</span>
+                  </div>
+                )}
+
+                {releasesError && (
+                  <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-xl text-red-300 text-xs flex items-center justify-between">
+                    <span>{releasesError}</span>
+                    <button
+                      onClick={fetchGitHubReleases}
+                      className="px-2.5 py-1 bg-red-500/30 hover:bg-red-500/50 rounded-lg text-[10px] text-white cursor-pointer font-bold"
+                    >
+                      Réessayer
+                    </button>
+                  </div>
+                )}
+
+                {!loadingReleases && !releasesError && githubReleases.length === 0 && (
+                  <div className="py-4 text-center text-slate-400 text-xs">
+                    Aucune release GitHub trouvée pour ce dépôt.
+                  </div>
+                )}
+
+                {!loadingReleases && githubReleases.length > 0 && (
+                  <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+                    {githubReleases.map((rel) => {
+                      const cleanTag = rel.tag_name.replace(/^v/, '');
+                      const cleanApp = appVersion.replace(/^v/, '');
+                      const isCurrent = cleanTag === cleanApp;
+                      
+                      // Look for .exe asset in release assets
+                      const exeAsset = rel.assets?.find(a => a.name.endsWith('.exe'));
+                      const downloadUrl = exeAsset ? exeAsset.browser_download_url : rel.html_url;
+
+                      const pubDate = rel.published_at 
+                        ? new Date(rel.published_at).toLocaleDateString('fr-FR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })
+                        : '';
+
+                      return (
+                        <div
+                          key={rel.id}
+                          className={`p-3 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                            isCurrent
+                              ? 'bg-[#34A853]/10 border-[#34A853]/40'
+                              : 'bg-black/25 border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono font-bold text-white text-xs flex items-center space-x-1">
+                                <Tag className="w-3 h-3 text-[#8ab4f8]" />
+                                <span>{rel.tag_name}</span>
+                              </span>
+
+                              {isCurrent ? (
+                                <span className="px-2 py-0.5 rounded-full bg-[#34A853]/20 border border-[#34A853]/50 text-[#34A853] text-[10px] font-bold">
+                                  Version Actuelle
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-medium">
+                                  Rétrogradation disponible
+                                </span>
+                              )}
+
+                              {pubDate && (
+                                <span className="text-[10px] text-slate-400">
+                                  • Publiée le {pubDate}
+                                </span>
+                              )}
+                            </div>
+
+                            {rel.name && rel.name !== rel.tag_name && (
+                              <p className="text-[11px] text-slate-300 font-medium">{rel.name}</p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-2 shrink-0">
+                            {isCurrent ? (
+                              <button
+                                onClick={() => handleOpenExternalUrl(rel.html_url)}
+                                className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-white text-[11px] font-medium flex items-center space-x-1 transition-colors cursor-pointer"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Voir sur GitHub</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenExternalUrl(downloadUrl)}
+                                className="px-3.5 py-1.5 rounded-full bg-[#FBBC04]/20 hover:bg-[#FBBC04]/30 border border-[#FBBC04]/40 text-[#FBBC04] text-[11px] font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+                              >
+                                <ArrowDownCircle className="w-3.5 h-3.5" />
+                                <span>Rétrograder vers {rel.tag_name} (.exe)</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

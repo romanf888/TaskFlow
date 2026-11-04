@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitAndInstallUpdate: () => ipcRenderer.invoke('quit-and-install-update'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   openExternalBrowserAuth: () => ipcRenderer.invoke('open-external-browser-auth'),
+  openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
