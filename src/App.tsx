@@ -9,6 +9,7 @@ import { DocumentManagerModal } from './components/DocumentManagerModal';
 import { ImageLightboxModal } from './components/ImageLightboxModal';
 import { GoogleAuthModal } from './components/GoogleAuthModal';
 import { AboutModal } from './components/AboutModal';
+import { SettingsModal } from './components/SettingsModal';
 import { UpdateNotification } from './components/UpdateNotification';
 import { Task, TaskStatus } from './types/task';
 import { 
@@ -39,6 +40,7 @@ const MainAppContent: React.FC = () => {
   const [isDocManagerOpen, setIsDocManagerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Global Keyboard Shortcuts
@@ -61,6 +63,7 @@ const MainAppContent: React.FC = () => {
         setIsDocManagerOpen(false);
         setIsAuthModalOpen(false);
         setIsAboutModalOpen(false);
+        setIsSettingsModalOpen(false);
         setLightboxImage(null);
       }
     };
@@ -86,6 +89,7 @@ const MainAppContent: React.FC = () => {
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         onOpenNewDocModal={() => setIsDocManagerOpen(true)}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -100,6 +104,7 @@ const MainAppContent: React.FC = () => {
           }}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onOpenAboutModal={() => setIsAboutModalOpen(true)}
+          onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         />
 
         {/* 3. Main 3-Column Kanban Board (À faire, En cours, Fait) */}
@@ -140,6 +145,15 @@ const MainAppContent: React.FC = () => {
                 </span>
               )}
             </div>
+            <span className="text-slate-600">|</span>
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="hover:text-blue-400 transition-colors cursor-pointer flex items-center space-x-1"
+              title="Vérifier les mises à jour logicielles"
+            >
+              <RotateCw className="w-3 h-3 text-cyan-400" />
+              <span>Mises à jour</span>
+            </button>
             <span className="text-slate-600">|</span>
             <button
               onClick={() => setIsAboutModalOpen(true)}
@@ -191,14 +205,22 @@ const MainAppContent: React.FC = () => {
         />
       )}
 
-      {/* 6. About Modal */}
+      {/* 6. Settings & Updates Modal */}
+      {isSettingsModalOpen && (
+        <SettingsModal
+          onClose={() => setIsSettingsModalOpen(false)}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        />
+      )}
+
+      {/* 7. About Modal */}
       {isAboutModalOpen && (
         <AboutModal
           onClose={() => setIsAboutModalOpen(false)}
         />
       )}
 
-      {/* 7. GitHub Auto-Update Notification Banner (Electron Desktop) */}
+      {/* 8. GitHub Auto-Update Notification Banner (Electron Desktop) */}
       <UpdateNotification />
     </div>
   );

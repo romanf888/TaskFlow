@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion Google - TaskFlow Windows</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 20%, #151a2d 0%, #0a0c14 100%);
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(22, 26, 43, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 36px 32px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(59, 130, 246, 0.15);
+      backdrop-filter: blur(12px);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #60a5fa;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 10px;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .btn-google {
+      width: 100%;
+      background: #ffffff;
+      color: #1e293b;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 13px 20px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+    }
+    .btn-google:hover {
+      background: #f8fafc;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+    .btn-google:active {
+      transform: translateY(0);
+    }
+    .btn-google:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .success-box {
+      display: none;
+      padding: 20px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 12px;
+      color: #34d399;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .error-box {
+      display: none;
+      padding: 14px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 10px;
+      color: #f87171;
+      font-size: 12px;
+      margin-top: 16px;
+      text-align: left;
+    }
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(0, 0, 0, 0.2);
+      border-radius: 50%;
+      border-top-color: #1e293b;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .footer-note {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+      TaskFlow Windows - Authentification
+    </div>
+
+    <div id="login-view">
+      <h1>Connexion Google</h1>
+      <p>Connectez votre compte Google dans votre navigateur officiel. Vos tâches et tableaux seront synchronisés instantanément sur votre application Windows.</p>
+
+      <button id="login-btn" class="btn-google">
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <span id="btn-text">Se connecter avec mon compte Google</span>
+      </button>
+
+      <div id="error-box" class="error-box"></div>
+      <div class="footer-note">Cette page communique en toute sécurité avec votre application locale TaskFlow.</div>
+    </div>
+
+    <div id="success-view" class="success-box">
+      <div style="font-size: 32px; margin-bottom: 10px;">🎉</div>
+      <strong style="display: block; font-size: 16px; margin-bottom: 6px;">Connexion réussie !</strong>
+      <div id="user-email-display" style="color: #a7f3d0; margin-bottom: 12px; font-size: 13px;"></div>
+      <p style="color: #94a3b8; font-size: 12px; margin-bottom: 0;">Vous pouvez fermer cet onglet et retourner sur l'application <strong>TaskFlow Windows</strong>.</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    let firebaseConfig = {
+      apiKey: "AIzaSyBpWKftClA4EUhs-pIjUzf1iSV3EvJW6w0",
+      authDomain: "loyal-science-0szp9.firebaseapp.com",
+      projectId: "loyal-science-0szp9",
+      appId: "1:589770041043:web:771f73fc30668054349626"
+    };
+
+    try {
+      const res = await fetch('/api/firebase-config');
+      if (res.ok) {
+        const loaded = await res.json();
+        firebaseConfig = { ...firebaseConfig, ...loaded };
+      }
+    } catch (e) {}
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    const loginBtn = document.getElementById('login-btn');
+    const btnText = document.getElementById('btn-text');
+    const errorBox = document.getElementById('error-box');
+    const loginView = document.getElementById('login-view');
+    const successView = document.getElementById('success-view');
+    const userEmailDisplay = document.getElementById('user-email-display');
+
+    async function handleLogin() {
+      loginBtn.disabled = true;
+      btnText.innerHTML = '<span class="spinner"></span> Connexion en cours...';
+      errorBox.style.display = 'none';
+
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const idToken = credential?.idToken || (await result.user.getIdToken());
+        const accessToken = credential?.accessToken || '';
+
+        // Notify local Electron app
+        await fetch('/api/auth-callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idToken,
+            accessToken,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            photoURL: result.user.photoURL,
+            uid: result.user.uid
+          })
+        });
+
+        loginView.style.display = 'none';
+        successView.style.display = 'block';
+        userEmailDisplay.textContent = 'Connecté sous : ' + (result.user.email || '');
+
+        setTimeout(() => {
+          try { window.close(); } catch {}
+        }, 3000);
+      } catch (err) {
+        console.error(err);
+        loginBtn.disabled = false;
+        btnText.textContent = 'Réessayer avec Google';
+        errorBox.textContent = 'Erreur : ' + (err.message || 'La connexion a été interrompue.');
+        errorBox.style.display = 'block';
+      }
+    }
+
+    loginBtn.addEventListener('click', handleLogin);
+
+    // Auto-trigger on page load
+    setTimeout(handleLogin, 500);
+  </script>
+</body>
+</html>

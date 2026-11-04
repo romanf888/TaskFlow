@@ -8,12 +8,13 @@ import {
   Monitor, 
   ShieldCheck, 
   LogOut, 
-  HardDrive,
   Mail,
   Lock,
   User as UserIcon,
   AlertCircle,
-  Loader2
+  Loader2,
+  ExternalLink,
+  Globe
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 
@@ -25,12 +26,14 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ onClose }) => 
   const { 
     user, 
     signInWithGoogle, 
+    signInWithGoogleBrowser, 
     signInWithEmail, 
     registerWithEmail, 
     signOut 
   } = useTaskContext();
 
-  const [authMode, setAuthMode] = useState<'google' | 'email'>('google');
+  const [authMode, setAuthMode] = useState<'browser' | 'email' | 'direct'>('browser');
+  const [waitingBrowser, setWaitingBrowser] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('romanferriere4@gmail.com');
   const [password, setPassword] = useState('');
@@ -38,14 +41,25 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ onClose }) => 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGoogleSignIn = async () => {
+  const handleBrowserLogin = async () => {
+    setError(null);
+    setWaitingBrowser(true);
+    try {
+      await signInWithGoogleBrowser();
+    } catch (err: any) {
+      setError(err?.message || 'Impossible d\'ouvrir le navigateur.');
+      setWaitingBrowser(false);
+    }
+  };
+
+  const handleDirectGoogleLogin = async () => {
     setError(null);
     setLoading(true);
     try {
       await signInWithGoogle();
       onClose();
     } catch (err: any) {
-      setError(err?.message || 'Erreur lors de la connexion Google.');
+      setError(err?.message || 'Erreur lors de la connexion Google directe.');
     } finally {
       setLoading(false);
     }
@@ -95,7 +109,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ onClose }) => 
               <Cloud className="w-4 h-4" />
             </div>
             <h3 className="text-sm font-bold text-white tracking-wide">
-              Synchronisation Cloud TaskFlow
+              Connexion & Synchronisation Cloud
             </h3>
           </div>
           <button
@@ -168,25 +182,25 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ onClose }) => 
             <div className="space-y-4">
               <div className="text-center space-y-1">
                 <h4 className="text-sm font-semibold text-white">
-                  Connectez-vous pour synchroniser vos tâches
+                  Synchronisez vos tâches sur tous vos appareils
                 </h4>
                 <p className="text-slate-400 text-xs">
-                  Retrouvez vos projets et vos tâches Kanban sauvegardés et synchronisés en direct.
+                  Connectez-vous pour sauvegarder vos documents et retrouver vos tableaux partout.
                 </p>
               </div>
 
-              {/* Tabs: Google or Email */}
+              {/* Tabs */}
               <div className="flex p-0.5 bg-[#0f121d] rounded-lg border border-white/10">
                 <button
                   type="button"
-                  onClick={() => { setAuthMode('google'); setError(null); }}
+                  onClick={() => { setAuthMode('browser'); setError(null); }}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${
-                    authMode === 'google'
+                    authMode === 'browser'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Compte Google
+                  Navigateur (Google)
                 </button>
                 <button
                   type="button"
@@ -208,37 +222,52 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ onClose }) => 
                 </div>
               )}
 
-              {authMode === 'google' ? (
-                /* Google Mode */
+              {authMode === 'browser' ? (
+                /* Primary Recommended: Open Default System Browser */
                 <div className="space-y-3">
-                  <div className="space-y-2 bg-[#1e2334] p-3 rounded-lg border border-white/10 text-slate-300">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>Connexion 1-clic avec votre compte Google</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
-                      <span>Synchronisation Cloud sécurisée sur Firebase</span>
+                  <div className="bg-[#1e2334] p-3.5 rounded-lg border border-white/10 space-y-2 text-slate-300">
+                    <div className="flex items-start space-x-2.5">
+                      <Globe className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-white">Connexion via votre navigateur (Chrome / Edge / Firefox)</span>
+                        <p className="text-slate-400 text-[11px] mt-0.5">
+                          Évite les blocages de fenêtres popups. La connexion se fait sur votre navigateur habituel et transmet automatiquement la session à TaskFlow.
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleGoogleSignIn}
-                    disabled={loading}
-                    className="w-full py-2.5 bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-900 font-semibold rounded-lg text-xs flex items-center justify-center space-x-2.5 shadow-lg transition-all active:scale-[0.99] cursor-pointer"
-                  >
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
-                    ) : (
+                  {waitingBrowser ? (
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg text-center space-y-2">
+                      <div className="flex items-center justify-center space-x-2 text-blue-400">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="font-semibold">En attente de connexion...</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        Veuillez vous connecter sur l'onglet de navigateur qui vient de s'ouvrir. Cette fenêtre se mettra à jour toute seule !
+                      </p>
+                      <button
+                        onClick={handleBrowserLogin}
+                        className="text-[11px] text-blue-400 hover:text-blue-300 underline cursor-pointer mt-1 block mx-auto"
+                      >
+                        Rouvrir l'onglet si besoin
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleBrowserLogin}
+                      className="w-full py-3 bg-white hover:bg-slate-100 text-slate-900 font-semibold rounded-lg text-xs flex items-center justify-center space-x-2.5 shadow-lg transition-all active:scale-[0.99] cursor-pointer"
+                    >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                       </svg>
-                    )}
-                    <span>Continuer avec Google</span>
-                  </button>
+                      <span>Se connecter avec Google dans mon navigateur</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                    </button>
+                  )}
                 </div>
               ) : (
                 /* Email / Password Mode */

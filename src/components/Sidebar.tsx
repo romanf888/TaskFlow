@@ -20,7 +20,8 @@ import {
   CheckSquare, 
   Sparkles,
   ChevronRight,
-  HardDrive
+  HardDrive,
+  Settings
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 import { Task } from '../types/task';
@@ -28,6 +29,7 @@ import { Task } from '../types/task';
 interface SidebarProps {
   onOpenNewDocModal: () => void;
   onOpenAuthModal: () => void;
+  onOpenSettingsModal?: () => void;
   isOpen: boolean;
   onToggle: () => void;
 }
@@ -35,6 +37,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   onOpenNewDocModal,
   onOpenAuthModal,
+  onOpenSettingsModal,
   isOpen,
   onToggle,
 }) => {
@@ -315,6 +318,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Cloud className="w-3.5 h-3.5" />
               <span>Connecter Google Cloud</span>
+            </button>
+          )}
+
+          {onOpenSettingsModal && (
+            <button
+              onClick={onOpenSettingsModal}
+              className="w-full mt-2 py-1.5 px-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg text-[11px] flex items-center justify-center space-x-2 transition-colors cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5 text-slate-400" />
+              <span>Paramètres & Mises à jour</span>
             </button>
           )}
         </div>

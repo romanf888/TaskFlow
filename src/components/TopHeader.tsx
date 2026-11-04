@@ -17,7 +17,8 @@ import {
   Code,
   Rocket,
   Star,
-  Folder
+  Folder,
+  Settings
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 
@@ -27,6 +28,7 @@ interface TopHeaderProps {
   onOpenNewTaskModal: () => void;
   onOpenAuthModal: () => void;
   onOpenAboutModal: () => void;
+  onOpenSettingsModal?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -35,6 +37,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenNewTaskModal,
   onOpenAuthModal,
   onOpenAboutModal,
+  onOpenSettingsModal,
 }) => {
   const {
     activeBoard,
@@ -180,6 +183,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         >
           <Download className="w-4 h-4" />
         </button>
+
+        {/* Settings & Auto-Updates button */}
+        {onOpenSettingsModal && (
+          <button
+            onClick={onOpenSettingsModal}
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+            title="Paramètres & Mises à jour du logiciel"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Cloud sync button / status */}
         <button

@@ -13,6 +13,7 @@ import {
   db, 
   onAuthStateChanged, 
   loginWithGoogle, 
+  loginWithGoogleCredential,
   loginWithEmail,
   registerWithEmail,
   logoutUser, 
@@ -65,6 +66,7 @@ interface TaskContextType {
 
   // Auth actions
   signInWithGoogle: () => Promise<void>;
+  signInWithGoogleBrowser: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -625,6 +627,34 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const handleGoogleBrowserLogin = async () => {
+    if (window.electronAPI?.openExternalBrowserAuth) {
+      await window.electronAPI.openExternalBrowserAuth();
+      showNotification('Fenêtre ouverte dans votre navigateur. Connectez-vous avec Google...');
+    } else {
+      await handleGoogleLogin();
+    }
+  };
+
+  // Listen for Google Auth callback from external browser
+  useEffect(() => {
+    if (!window.electronAPI?.onGoogleAuthCredential) return;
+    const unsub = window.electronAPI.onGoogleAuthCredential(async (data: any) => {
+      try {
+        setSyncStatus('syncing');
+        if (data?.idToken) {
+          await loginWithGoogleCredential(data.idToken, data.accessToken);
+          showNotification('Connecté avec succès via votre navigateur !');
+        }
+      } catch (err: any) {
+        console.error('Browser credential login error', err);
+        showNotification('Échec connexion : ' + (err?.message || 'Erreur inconnue'));
+        setSyncStatus('local');
+      }
+    });
+    return () => unsub();
+  }, [showNotification]);
+
   const handleEmailLogin = async (email: string, pass: string) => {
     try {
       setSyncStatus('syncing');
@@ -705,6 +735,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         duplicateTask,
         toggleSubtask,
         signInWithGoogle: handleGoogleLogin,
+        signInWithGoogleBrowser: handleGoogleBrowserLogin,
         signInWithEmail: handleEmailLogin,
         registerWithEmail: handleEmailRegister,
         signOut: handleLogout,

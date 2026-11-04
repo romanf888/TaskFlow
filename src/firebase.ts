@@ -94,6 +94,13 @@ export async function loginWithGoogle(): Promise<User> {
   return result.user;
 }
 
+export async function loginWithGoogleCredential(idToken: string, accessToken?: string): Promise<User> {
+  const { signInWithCredential } = await import('firebase/auth');
+  const credential = GoogleAuthProvider.credential(idToken, accessToken);
+  const result = await signInWithCredential(auth, credential);
+  return result.user;
+}
+
 export async function loginWithEmail(email: string, pass: string): Promise<User> {
   const { signInWithEmailAndPassword } = await import('firebase/auth');
   const result = await signInWithEmailAndPassword(auth, email, pass);
