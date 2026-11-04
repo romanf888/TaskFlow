@@ -13,3 +13,7 @@ coverage/
 .vs/
 release/
 *.vsidx
+
+.vs/
+release/
+*.vsidx
