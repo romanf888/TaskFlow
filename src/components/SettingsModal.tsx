@@ -65,7 +65,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
   const [activeTab, setActiveTab] = useState<'appearance' | 'tasks' | 'sync' | 'storage' | 'updates'>('appearance');
-  const [appVersion, setAppVersion] = useState('1.0.9.1');
+  const [appVersion, setAppVersion] = useState('1.0.10');
   const [updaterState, setUpdaterState] = useState<UpdaterStatusState>({ status: 'idle' });
   const [isChecking, setIsChecking] = useState(false);
 
@@ -662,10 +662,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-1">
                     <span className="text-xs font-bold text-purple-300 flex items-center space-x-1.5">
                       <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-                      <span>Mises à Jour Mineures (ex: 1.0.9.1)</span>
+                      <span>Mises à Jour Mineures (ex: 1.0.10, 1.0.11)</span>
                     </span>
                     <p className="text-[10.5px] text-slate-300">
-                      Générées systématiquement pour les corrections de bugs et ajustements rapides.
+                      Générées systématiquement à chaque correction ou ajustement.
                     </p>
                   </div>
                 </div>
