@@ -16,6 +16,11 @@ declare global {
       quitAndInstallUpdate: () => Promise<void>;
       getAppVersion: () => Promise<string>;
       openExternalBrowserAuth?: () => Promise<boolean>;
+      clearAppCache?: () => Promise<any>;
+      minimizeWindow?: () => void;
+      maximizeWindow?: () => void;
+      closeWindow?: () => void;
+      isMaximized?: () => Promise<boolean>;
       onUpdaterStatus?: (callback: (data: UpdaterStatusPayload) => void) => () => void;
       onGoogleAuthCredential?: (callback: (data: any) => void) => () => void;
     };

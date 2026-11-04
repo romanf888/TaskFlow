@@ -506,12 +506,33 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const saveCurrentDocument = () => {
-    // Explicit save action
-    localStorage.setItem(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(boards));
-    localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(allTasks));
-    setLastSyncTime(new Date());
-    showNotification(`Document "${activeBoard?.title}" enregistré.`);
+  const saveCurrentDocument = async () => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(boards));
+      localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(allTasks));
+
+      if (user && activeBoard) {
+        setSyncStatus('syncing');
+        await setDoc(doc(db, 'boards', activeBoard.id), cleanFirestoreData({
+          ...activeBoard,
+          ownerId: user.uid,
+          isCloud: true,
+          updatedAt: new Date().toISOString(),
+        }), { merge: true });
+
+        const boardTasks = allTasks.filter((t) => t.boardId === activeBoard.id);
+        for (const task of boardTasks) {
+          await setDoc(doc(db, `boards/${activeBoard.id}/tasks`, task.id), cleanFirestoreData(task), { merge: true });
+        }
+        setSyncStatus('synced');
+      }
+
+      setLastSyncTime(new Date());
+      showNotification(`Document "${activeBoard?.title || 'Actif'}" enregistré avec succès !`);
+    } catch (err: any) {
+      console.error('Save error:', err);
+      showNotification('Erreur lors de l’enregistrement.');
+    }
   };
 
   // Task Operations

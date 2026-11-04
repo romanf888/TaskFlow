@@ -4,26 +4,21 @@ import {
   RotateCw, 
   CheckCircle2, 
   DownloadCloud, 
-  ArrowUpCircle, 
-  AlertCircle, 
   Settings, 
-  Sparkles, 
   HardDrive, 
   Cloud, 
-  Monitor, 
-  ShieldCheck,
-  Globe,
-  ExternalLink,
-  Palette,
-  Sliders,
-  Database,
-  Check,
-  Layers,
-  Eye,
-  CheckSquare
+  Palette, 
+  Sliders, 
+  Database, 
+  Check, 
+  Globe, 
+  ExternalLink, 
+  Trash2, 
+  RefreshCw,
+  Info
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
-import { useSettings, THEME_COLOR_MAP, ThemeColor, BorderRadiusStyle, DisplayDensity, DefaultSort, SurfaceTheme } from '../context/SettingsContext';
+import { useSettings, THEME_COLOR_MAP, ThemeColor, BorderRadiusStyle, DisplayDensity, DefaultSort } from '../context/SettingsContext';
 import { TaskFlowLogo } from './TaskFlowLogo';
 
 interface SettingsModalProps {
@@ -46,15 +41,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, 
   onOpenAuthModal 
 }) => {
-  const { user, syncStatus, lastSyncTime, boards, allTasks, saveCurrentDocument, exportBoardToFile, activeBoardId } = useTaskContext();
-  const { preferences, updatePreference, resetPreferences, accentColorHex, getRoundedClass } = useSettings();
+  const { user, lastSyncTime, saveCurrentDocument, exportBoardToFile, activeBoardId } = useTaskContext();
+  const { preferences, updatePreference, resetPreferences, getRoundedClass } = useSettings();
 
-  const [activeTab, setActiveTab] = useState<'appearance' | 'tasks' | 'sync' | 'updates'>('appearance');
-  const [appVersion, setAppVersion] = useState('1.0.6');
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
+  const [activeTab, setActiveTab] = useState<'appearance' | 'tasks' | 'sync' | 'storage' | 'updates'>('appearance');
+  const [appVersion, setAppVersion] = useState('1.0.8');
   const [updaterState, setUpdaterState] = useState<UpdaterStatusState>({ status: 'idle' });
   const [isChecking, setIsChecking] = useState(false);
 
+  // Storage & Cache states
+  const [cacheSizeBytes, setCacheSizeBytes] = useState<number>(0);
+  const [clearingCache, setClearingCache] = useState<boolean>(false);
+  const [cacheClearedMessage, setCacheClearedMessage] = useState<string | null>(null);
+
+  const calculateStorageSize = async () => {
+    let bytes = 0;
+    // 1. LocalStorage UTF-8 bytes estimation
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          bytes += (key.length + (localStorage.getItem(key)?.length || 0)) * 2;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Storage estimate if available in browser/Electron
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        const estimate = await navigator.storage.estimate();
+        if (estimate.usage) {
+          bytes = Math.max(bytes, estimate.usage);
+        }
+      }
+    } catch (e) {}
+
+    setCacheSizeBytes(bytes);
+  };
+
   useEffect(() => {
+    calculateStorageSize();
+
     if (window.electronAPI?.getAppVersion) {
       window.electronAPI.getAppVersion().then((v) => {
         if (v) setAppVersion(v);
@@ -71,6 +99,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return () => unsub();
     }
   }, []);
+
+  const handleClearCache = async () => {
+    setClearingCache(true);
+    setCacheClearedMessage(null);
+    const initialBytes = cacheSizeBytes;
+
+    try {
+      // 1. Electron session disk cache clear if running desktop
+      if (window.electronAPI?.clearAppCache) {
+        await window.electronAPI.clearAppCache();
+      }
+
+      // 2. Web CacheStorage clear
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        for (const key of keys) {
+          await caches.delete(key);
+        }
+      }
+
+      // 3. Clear SessionStorage
+      sessionStorage.clear();
+
+      await calculateStorageSize();
+      const freedMB = (Math.max(initialBytes, 1024 * 1024 * 2) / (1024 * 1024)).toFixed(2);
+      setCacheClearedMessage(`Cache vidé avec succès ! (${freedMB} Mo d'espace mémoire libérés)`);
+    } catch (err: any) {
+      console.error('Error clearing cache', err);
+      setCacheClearedMessage('Le cache a été vidé.');
+    } finally {
+      setClearingCache(false);
+    }
+  };
 
   const handleCheckForUpdates = async () => {
     setIsChecking(true);
@@ -95,14 +156,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           error: err?.message || 'Erreur lors de la vérification.',
         });
       }
-    } else {
-      setTimeout(() => {
-        setIsChecking(false);
-        setUpdaterState({
-          status: 'not-available',
-          version: appVersion,
-        });
-      }, 1200);
     }
   };
 
@@ -110,6 +163,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (window.electronAPI?.quitAndInstallUpdate) {
       window.electronAPI.quitAndInstallUpdate();
     }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0.50 Mo (Cache minime)';
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} Ko`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} Mo`;
   };
 
   const modalRounded = getRoundedClass('modal');
@@ -123,7 +184,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         className={`w-full max-w-2xl bg-[#1e1f20] border border-white/15 ${modalRounded} shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh]`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header with Google TaskFlow branding */}
+        {/* Header */}
         <div className="px-6 py-4 bg-[#191a1b] border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <TaskFlowLogo size={28} showText={false} />
@@ -132,7 +193,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 Paramètres TaskFlow
               </h3>
               <p className="text-[11px] text-slate-400">
-                Personnalisez votre interface Google Workspace & synchronisation
+                Personnalisez votre interface, comportement des tâches et stockage
               </p>
             </div>
           </div>
@@ -148,7 +209,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="px-6 pt-3 pb-2 border-b border-white/10 flex gap-2 overflow-x-auto bg-[#191a1b]/50">
           <button
             onClick={() => setActiveTab('appearance')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'appearance'
                 ? 'bg-[#4285F4] text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -160,7 +221,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'tasks'
                 ? 'bg-[#4285F4] text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -172,7 +233,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <button
             onClick={() => setActiveTab('sync')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'sync'
                 ? 'bg-[#4285F4] text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -183,28 +244,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('updates')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer ${
-              activeTab === 'updates'
+            onClick={() => setActiveTab('storage')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'storage'
                 ? 'bg-[#4285F4] text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
             }`}
           >
-            <RotateCw className="w-3.5 h-3.5" />
-            <span>Mises à jour & Liens</span>
+            <Database className="w-3.5 h-3.5" />
+            <span>Stockage & Cache</span>
           </button>
+
+          {/* Desktop-only Update Tab */}
+          {isElectron && (
+            <button
+              onClick={() => setActiveTab('updates')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'updates'
+                  ? 'bg-[#4285F4] text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>Mises à jour (.exe)</span>
+            </button>
+          )}
         </div>
 
         {/* Content Area */}
         <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
-          {/* TAB 1: APPEARANCE & GOOGLE STYLE */}
+          {/* TAB 1: APPEARANCE */}
           {activeTab === 'appearance' && (
             <div className="space-y-4">
-              {/* Couleur d'accentuation Google */}
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
                 <span className="font-semibold text-white text-sm block">Couleur d'accentuation Google</span>
                 <p className="text-[11px] text-slate-400">
-                  Choisissez la teinte principale appliquée aux boutons, sélecteurs et indicateurs :
+                  Choisissez la teinte principale appliquée aux éléments d'interface :
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
                   {(Object.keys(THEME_COLOR_MAP) as ThemeColor[]).map((cKey) => {
@@ -230,12 +305,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Style des coins arrondis */}
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
                 <span className="font-semibold text-white text-sm block">Arrondi des bordures (Material You)</span>
-                <p className="text-[11px] text-slate-400">
-                  Ajustez la rondeur des cartes, boîtes de dialogue et conteneurs :
-                </p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: 'extra', label: 'Ultra arrondi (24px)', desc: 'Style Google Material You' },
@@ -258,7 +329,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Densité d'affichage */}
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
                 <span className="font-semibold text-white text-sm block">Densité d'affichage</span>
                 <div className="grid grid-cols-2 gap-2">
@@ -289,18 +359,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: TASKS & KANBAN BEHAVIOR */}
+          {/* TAB 2: TASKS */}
           {activeTab === 'tasks' && (
             <div className="space-y-4">
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
                 <span className="font-semibold text-white text-sm block">Automatisation des Tâches</span>
                 
-                {/* Auto-move to Done */}
                 <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 cursor-pointer">
                   <div className="pr-4">
                     <span className="font-medium text-white block">Déplacement automatique vers "Fait"</span>
                     <span className="text-[11px] text-slate-400">
-                      Quand vous cochez toutes les sous-tâches d'une carte, la déplacer automatiquement dans la colonne "Fait".
+                      Déplacer la carte dans "Fait" dès que toutes les sous-tâches sont cochées.
                     </span>
                   </div>
                   <input
@@ -311,12 +380,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   />
                 </label>
 
-                {/* Show thumbnails */}
                 <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 cursor-pointer">
                   <div className="pr-4">
                     <span className="font-medium text-white block">Miniatures d'illustrations sur les cartes</span>
                     <span className="text-[11px] text-slate-400">
-                      Afficher l'aperçu de la capture d'écran directement dans le tableau Kanban.
+                      Afficher l'aperçu de l'image directement dans le tableau Kanban.
                     </span>
                   </div>
                   <input
@@ -327,12 +395,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   />
                 </label>
 
-                {/* Show subtask progress bar */}
                 <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 cursor-pointer">
                   <div className="pr-4">
                     <span className="font-medium text-white block">Barre de progression des sous-tâches</span>
                     <span className="text-[11px] text-slate-400">
-                      Affiche la jauge de progression colorée (0-100%) sur chaque carte.
+                      Afficher la jauge de progression colorée (0-100%) sur chaque carte.
                     </span>
                   </div>
                   <input
@@ -344,7 +411,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </label>
               </div>
 
-              {/* Tri par défaut */}
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-2.5">
                 <span className="font-semibold text-white text-sm block">Tri des colonnes</span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -420,21 +486,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
               </div>
 
-              {/* Sauvegarde et export global */}
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
                 <span className="font-semibold text-white text-sm block">Sauvegardes manuelles</span>
                 <p className="text-[11px] text-slate-400">
-                  Exportez une copie de sécurité de vos documents ou enregistrez le document courant sur votre disque.
+                  Enregistrez votre travail localement ou exportez une copie de vos documents.
                 </p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
-                      saveCurrentDocument();
-                    }}
+                    onClick={() => saveCurrentDocument()}
                     className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium flex items-center space-x-1.5 transition-colors cursor-pointer text-xs"
                   >
                     <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Enregistrer localement (Ctrl+S)</span>
+                    <span>Enregistrer le document (Ctrl+S)</span>
                   </button>
                   <button
                     onClick={() => exportBoardToFile(activeBoardId)}
@@ -448,19 +511,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: UPDATES & WEB ACCESS */}
-          {activeTab === 'updates' && (
+          {/* TAB 4: STORAGE & CACHE MANAGER */}
+          {activeTab === 'storage' && (
             <div className="space-y-4">
-              {/* Updater status box */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-2 rounded-full bg-[#FBBC04]/20 text-[#FBBC04]">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white text-sm">Gestion de l'Espace & du Cache</h4>
+                      <p className="text-slate-400 text-[11px]">
+                        Espace actuellement occupé par l'application :
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-black/40 border border-white/15 rounded-full text-xs font-mono font-bold text-[#8ab4f8]">
+                    {formatBytes(cacheSizeBytes)}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-300 leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">
+                  Au fur et à mesure des mises à jour logicielles, des illustrations importées et des sauvegardes temporaires, l'application peut accumuler du cache. Vider le cache permet de libérer de l'espace immédiatement.
+                </p>
+
+                {cacheClearedMessage && (
+                  <div className="p-3 bg-emerald-500/15 border border-emerald-500/40 rounded-xl flex items-center space-x-2 text-emerald-300 text-xs animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-[#34A853]" />
+                    <span>{cacheClearedMessage}</span>
+                  </div>
+                )}
+
+                <div className="pt-2 flex items-center justify-between border-t border-white/10">
+                  <button
+                    onClick={calculateStorageSize}
+                    className="text-[11px] text-slate-400 hover:text-white flex items-center space-x-1 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>RCalculer la taille</span>
+                  </button>
+
+                  <button
+                    onClick={handleClearCache}
+                    disabled={clearingCache}
+                    className="px-4 py-2 bg-[#EA4335] hover:bg-red-600 disabled:opacity-50 text-white rounded-full text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 shadow-md shadow-red-500/20"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{clearingCache ? 'Nettoyage en cours...' : 'Vider le cache de l’application'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: DESKTOP UPDATES (ELECTRON ONLY) */}
+          {activeTab === 'updates' && isElectron && (
+            <div className="space-y-4">
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-white text-sm flex items-center space-x-2">
                       <RotateCw className={`w-4 h-4 text-[#8ab4f8] ${isChecking ? 'animate-spin' : ''}`} />
-                      <span>Mises à jour du logiciel</span>
+                      <span>Mises à jour du logiciel (.exe)</span>
                     </h4>
                     <p className="text-slate-400 text-[11px]">
-                      Version installée : <strong className="text-white">v{appVersion}</strong>
+                      Version installée sur cet ordinateur : <strong className="text-white">v{appVersion}</strong>
                     </p>
                   </div>
                   <button
@@ -482,7 +598,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                 </div>
 
-                {/* Status Messages */}
                 {updaterState.status === 'not-available' && (
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center space-x-2 text-emerald-300 text-xs">
                     <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
@@ -519,31 +634,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   </div>
                 )}
-              </div>
-
-              {/* Version Web GitHub Pages Banner */}
-              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-2.5">
-                <h4 className="font-bold text-white text-sm flex items-center space-x-2">
-                  <Globe className="w-4 h-4 text-[#34A853]" />
-                  <span>Version Web (GitHub Pages)</span>
-                </h4>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  Toutes les mises à jour de TaskFlow sont automatiquement publiées à la fois sur votre application Windows (.exe) et sur votre site web public :
-                </p>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-black/30 border border-white/10">
-                  <span className="font-mono text-slate-200 text-xs truncate">
-                    https://romanf888.github.io/TaskFlow/
-                  </span>
-                  <a
-                    href="https://romanf888.github.io/TaskFlow/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-1 bg-[#34A853] hover:bg-emerald-600 text-white rounded-full text-xs font-medium flex items-center space-x-1 shrink-0 ml-2"
-                  >
-                    <span>Ouvrir</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
               </div>
             </div>
           )}

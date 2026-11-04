@@ -258,6 +258,20 @@ ipcMain.handle('is-maximized', () => {
   return mainWindow?.isMaximized() || false;
 });
 
+ipcMain.handle('clear-app-cache', async () => {
+  try {
+    if (mainWindow) {
+      await mainWindow.webContents.session.clearCache();
+      await mainWindow.webContents.session.clearStorageData({
+        storages: ['appcache', 'filesystem', 'indexdb', 'shadercache', 'websql', 'serviceworkers', 'cachestorage']
+      });
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle('open-external-browser-auth', () => {
   const localAuthUrl = `http://localhost:${currentServerPort}/login-browser.html?port=${currentServerPort}`;
   shell.openExternal(localAuthUrl);

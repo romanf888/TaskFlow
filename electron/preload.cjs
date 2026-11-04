@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   isMaximized: () => ipcRenderer.invoke('is-maximized'),
+  clearAppCache: () => ipcRenderer.invoke('clear-app-cache'),
   onUpdaterStatus: (callback) => {
     const subscription = (event, data) => callback(data);
     ipcRenderer.on('updater-status', subscription);

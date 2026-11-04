@@ -188,18 +188,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         <button
           onClick={saveCurrentDocument}
           className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-emerald-400 transition-colors cursor-pointer"
-          title="Sauvegarder les modifications (Ctrl+S)"
+          title="Sauvegarder le document (Ctrl+S)"
         >
           <Save className="w-4 h-4" />
-        </button>
-
-        {/* Export .taskflow */}
-        <button
-          onClick={() => exportBoardToFile(activeBoardId)}
-          className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-[#8ab4f8] transition-colors cursor-pointer"
-          title="Exporter le document (.taskflow)"
-        >
-          <Download className="w-4 h-4" />
         </button>
 
         {/* Settings button */}
