@@ -192,8 +192,10 @@ async function createWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    title: 'TaskFlow Windows',
-    backgroundColor: '#0c0e15',
+    title: 'TaskFlow Workspace',
+    backgroundColor: '#131314',
+    frame: false,
+    titleBarStyle: 'hidden',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -232,6 +234,26 @@ async function createWindow() {
 // IPC Handlers
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
+});
+
+ipcMain.handle('minimize-window', () => {
+  mainWindow?.minimize();
+});
+
+ipcMain.handle('maximize-window', () => {
+  if (mainWindow?.isMaximized()) {
+    mainWindow.unmaximize();
+  } else {
+    mainWindow?.maximize();
+  }
+});
+
+ipcMain.handle('close-window', () => {
+  mainWindow?.close();
+});
+
+ipcMain.handle('is-maximized', () => {
+  return mainWindow?.isMaximized() || false;
 });
 
 ipcMain.handle('open-external-browser-auth', () => {

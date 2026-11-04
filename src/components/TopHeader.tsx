@@ -8,13 +8,14 @@ import {
   Download, 
   Cloud, 
   CloudCheck, 
-  RotateCw, 
   Settings,
   Grip,
-  FolderOpen,
   Check,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Minus,
+  Square,
+  Maximize2
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 import { useSettings } from '../context/SettingsContext';
@@ -44,25 +45,54 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     setActiveBoardId,
     searchQuery,
     setSearchQuery,
-    selectedCategory,
-    setSelectedCategory,
-    categories,
     saveCurrentDocument,
     exportBoardToFile,
     user,
     syncStatus,
   } = useTaskContext();
 
-  const { preferences, accentColorHex, getRoundedClass } = useSettings();
+  const { preferences } = useSettings();
   const [showAppsMenu, setShowAppsMenu] = useState(false);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
 
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
   const activeColor = activeBoard?.color || '#4285F4';
 
+  const handleMinimize = () => {
+    if ((window as any).electronAPI?.minimizeWindow) {
+      (window as any).electronAPI.minimizeWindow();
+    }
+  };
+
+  const handleMaximize = async () => {
+    if ((window as any).electronAPI?.maximizeWindow) {
+      await (window as any).electronAPI.maximizeWindow();
+      if ((window as any).electronAPI?.isMaximized) {
+        const max = await (window as any).electronAPI.isMaximized();
+        setIsMaximized(max);
+      } else {
+        setIsMaximized(!isMaximized);
+      }
+    }
+  };
+
+  const handleClose = () => {
+    if ((window as any).electronAPI?.closeWindow) {
+      (window as any).electronAPI.closeWindow();
+    }
+  };
+
   return (
-    <header className="bg-[#1e1f20] border-b border-white/10 px-4 py-2.5 flex items-center justify-between gap-3 text-xs z-20 select-none shadow-md">
-      {/* Left: Hamburger menu + Google TaskFlow Logo + Document badge */}
-      <div className="flex items-center space-x-2 shrink-0">
+    <header 
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      className="bg-[#1e1f20] border-b border-white/10 px-4 py-2 flex items-center justify-between gap-3 text-xs z-20 select-none shadow-md shrink-0"
+    >
+      {/* Left: Hamburger menu + TaskFlow Logo + Document badge */}
+      <div 
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} 
+        className="flex items-center space-x-2 shrink-0"
+      >
         <button
           onClick={onToggleSidebar}
           className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
@@ -71,12 +101,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Google 4-Color TaskFlow Logo */}
+        {/* Custom TaskFlow Logo */}
         <div className="cursor-pointer" onClick={() => onOpenAboutModal()}>
           <TaskFlowLogo size={30} showText={true} />
         </div>
 
-        {/* Current Document Pill (Google Drive / Docs style) */}
+        {/* Current Document Pill */}
         <div className="relative hidden sm:block ml-2">
           <button
             onClick={() => setShowDocPicker(!showDocPicker)}
@@ -124,9 +154,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </div>
       </div>
 
-      {/* Center: Google Search Pill */}
+      {/* Center: Search Pill (Draggable outside the input itself) */}
       <div className="flex-1 max-w-xl mx-2">
-        <div className="relative flex items-center">
+        <div 
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} 
+          className="relative flex items-center"
+        >
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
@@ -146,9 +179,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Google Workspace Icons, Settings, User & + Nouvelle tâche */}
-      <div className="flex items-center space-x-1.5 shrink-0">
-        {/* Save local document button */}
+      {/* Right: Actions, User & Desktop Window Controls */}
+      <div 
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} 
+        className="flex items-center space-x-1.5 shrink-0"
+      >
+        {/* Save button */}
         <button
           onClick={saveCurrentDocument}
           className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-emerald-400 transition-colors cursor-pointer"
@@ -177,12 +213,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </button>
         )}
 
-        {/* Google 9-dots App Launcher */}
+        {/* 9-dots App Launcher */}
         <div className="relative">
           <button
             onClick={() => setShowAppsMenu(!showAppsMenu)}
             className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Applications & Raccourcis TaskFlow"
+            title="Services & Liens TaskFlow"
           >
             <Grip className="w-4 h-4" />
           </button>
@@ -220,15 +256,15 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center">
                     <ExternalLink className="w-4 h-4" />
                   </div>
-                  <span className="text-[11px] font-medium">Releases .exe</span>
-                  <span className="text-[9px] text-slate-400">Mises à jour</span>
+                  <span className="text-[11px] font-medium">Dépôt GitHub</span>
+                  <span className="text-[9px] text-slate-400">Code & Releases</span>
                 </a>
               </div>
             </div>
           )}
         </div>
 
-        {/* Google Profile / Cloud Auth Button */}
+        {/* User / Google Profile */}
         <button
           onClick={onOpenAuthModal}
           className="flex items-center space-x-1.5 p-1 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
@@ -265,6 +301,33 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span className="hidden md:inline font-sans">Créer</span>
         </button>
+
+        {/* Electron Window Actions (Frameless Native Window Controls) */}
+        {isElectron && (
+          <div className="flex items-center ml-2 pl-2 border-l border-white/15 h-8">
+            <button
+              onClick={handleMinimize}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              title="Réduire"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleMaximize}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              title={isMaximized ? "Restaurer" : "Agrandir"}
+            >
+              {isMaximized ? <Maximize2 className="w-3.5 h-3.5" /> : <Square className="w-3 h-3" />}
+            </button>
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#EA4335] rounded-lg transition-colors cursor-pointer"
+              title="Fermer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

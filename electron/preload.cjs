@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitAndInstallUpdate: () => ipcRenderer.invoke('quit-and-install-update'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   openExternalBrowserAuth: () => ipcRenderer.invoke('open-external-browser-auth'),
+  minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
+  maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
+  closeWindow: () => ipcRenderer.invoke('close-window'),
+  isMaximized: () => ipcRenderer.invoke('is-maximized'),
   onUpdaterStatus: (callback) => {
     const subscription = (event, data) => callback(data);
     ipcRenderer.on('updater-status', subscription);

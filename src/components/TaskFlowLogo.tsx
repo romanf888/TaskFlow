@@ -15,44 +15,50 @@ export const TaskFlowLogo: React.FC<TaskFlowLogoProps> = ({
 }) => {
   return (
     <div className={`flex items-center space-x-2.5 select-none ${className}`}>
-      {/* 4-Color Google-Style TaskFlow Emblem */}
+      {/* Unique TaskFlow Shield & Flow Emblem */}
       <svg
         width={size}
         height={size}
-        viewBox="0 0 48 48"
+        viewBox="0 0 512 512"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="shrink-0 drop-shadow-sm transition-transform hover:scale-105 duration-200"
+        className="shrink-0 drop-shadow-md transition-transform hover:scale-105 duration-200"
       >
-        {/* Blue bar */}
-        <path
-          d="M10 14C10 9.58172 13.5817 6 18 6H30C34.4183 6 38 9.58172 38 14V17H18C13.5817 17 10 14 10 14Z"
-          fill="#4285F4"
-        />
-        {/* Red block */}
-        <path
-          d="M30 6L38 14V26C38 30.4183 34.4183 34 30 34H26V17H30V6Z"
-          fill="#EA4335"
-        />
-        {/* Yellow base hook */}
-        <path
-          d="M10 24C10 19.5817 13.5817 16 18 16H22V32C22 36.4183 18.4183 40 14 40C11.7909 40 10 38.2091 10 36V24Z"
-          fill="#FBBC05"
-        />
-        {/* Green checkmark ribbon */}
-        <path
-          d="M16.5 28L23 34.5C24.1 35.6 25.9 35.6 27 34.5L41.5 19C42.6 17.9 42.6 16.1 41.5 15C40.4 13.9 38.6 13.9 37.5 15L25 27.5L19.5 22C18.4 20.9 16.6 20.9 15.5 22C14.4 23.1 14.4 24.9 15.5 26L16.5 28Z"
-          fill="#34A853"
-        />
+        <defs>
+          <linearGradient id="tf-grad-bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#1e2640" />
+            <stop offset="100%" stopColor="#0f1322" />
+          </linearGradient>
+          <linearGradient id="tf-blue-cyan" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#4285F4" />
+            <stop offset="100%" stopColor="#24c6ff" />
+          </linearGradient>
+          <linearGradient id="tf-green" x1="100" y1="200" x2="400" y2="450" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#34A853" />
+            <stop offset="100%" stopColor="#00e676" />
+          </linearGradient>
+          <linearGradient id="tf-yellow-orange" x1="0" y1="100" x2="300" y2="400" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#FBBC04" />
+            <stop offset="100%" stopColor="#ff7043" />
+          </linearGradient>
+        </defs>
+
+        {/* Outer Rounded Container Base */}
+        <rect x="32" y="32" width="448" height="448" rx="128" fill="url(#tf-grad-bg)" stroke="rgba(255,255,255,0.12)" strokeWidth="12" />
+
+        {/* TaskFlow Interlocking Flow Symbol */}
+        <path d="M120 160 C120 137.909 137.909 120 160 120 L352 120 C374.091 120 392 137.909 392 160 C392 182.091 374.091 200 352 200 L160 200 C137.909 200 120 182.091 120 160 Z" fill="url(#tf-blue-cyan)" />
+        <path d="M216 160 L296 160 L296 320 C296 342.091 278.091 360 256 360 C233.909 360 216 342.091 216 320 L216 160 Z" fill="url(#tf-yellow-orange)" opacity="0.9" />
+        <path d="M150 280 L230 360 C245 375 267 375 282 360 L410 230 C425 215 425 191 410 176 C395 161 371 161 356 176 L256 276 L190 210 C175 195 151 195 136 210 C121 225 121 249 136 264 L150 280 Z" fill="url(#tf-green)" />
       </svg>
 
       {showText && (
         <div className="flex items-center tracking-tight">
-          <span className="font-semibold text-white text-base font-sans tracking-tight">
+          <span className="font-bold text-white text-base font-sans tracking-tight">
             Task<span className="text-[#4285F4]">Flow</span>
           </span>
           {variant === 'full' && (
-            <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-medium bg-[#1e2334] text-[#8ab4f8] border border-[#8ab4f8]/30 rounded-full">
+            <span className="ml-1.5 px-2 py-0.5 text-[10px] font-semibold bg-[#4285F4]/15 text-[#8ab4f8] border border-[#4285F4]/30 rounded-full">
               Workspace
             </span>
           )}
