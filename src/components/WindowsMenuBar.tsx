@@ -16,7 +16,9 @@ import {
   Trash2,
   Info,
   SlidersHorizontal,
-  Cloud
+  Cloud,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 
@@ -232,6 +234,31 @@ export const WindowsMenuBar: React.FC<WindowsMenuBarProps> = ({
                   <Info className="w-3.5 h-3.5 text-blue-400" />
                   <span>À propos de TaskFlow Windows</span>
                 </button>
+                <div className="border-t border-white/10 my-1"></div>
+                <a
+                  href="https://romanf888.github.io/TaskFlow/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-blue-600/30 hover:text-white text-left transition-colors cursor-pointer text-slate-300"
+                >
+                  <span className="flex items-center space-x-2.5">
+                    <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Version Web (GitHub Pages)</span>
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </a>
+                <a
+                  href="https://github.com/romanf888/TaskFlow"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-blue-600/30 hover:text-white text-left transition-colors cursor-pointer text-slate-300"
+                >
+                  <span className="flex items-center space-x-2.5">
+                    <Cloud className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Dépôt GitHub & Releases</span>
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </a>
               </div>
             )}
           </div>

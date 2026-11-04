@@ -25,9 +25,11 @@ service cloud.firestore {
 
     function isValidBoard(data) {
       return data.keys().hasAll(['title', 'ownerId']) &&
-        data.keys().hasOnly(['title', 'ownerId', 'description', 'icon', 'color', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['title', 'ownerId', 'description', 'icon', 'color', 'createdAt', 'updatedAt', 'id', 'isCloud']) &&
         data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
         data.ownerId is string && data.ownerId == request.auth.uid &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('isCloud' in data) || data.isCloud is bool) &&
         (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
         (!('icon' in data) || (data.icon is string && data.icon.size() <= 50)) &&
         (!('color' in data) || (data.color is string && data.color.size() <= 20));
@@ -35,17 +37,18 @@ service cloud.firestore {
 
     function isValidTask(data) {
       return data.keys().hasAll(['title', 'status', 'boardId', 'ownerId']) &&
-        data.keys().hasOnly(['title', 'status', 'boardId', 'ownerId', 'description', 'priority', 'category', 'tags', 'subtasks', 'screenshotUrl', 'order', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['title', 'status', 'boardId', 'ownerId', 'description', 'priority', 'category', 'tags', 'subtasks', 'screenshotUrl', 'order', 'createdAt', 'updatedAt', 'id']) &&
         data.title is string && data.title.size() >= 1 && data.title.size() <= 150 &&
         data.status in ['todo', 'in_progress', 'done'] &&
         data.boardId is string && data.boardId.size() <= 128 &&
         data.ownerId is string && data.ownerId == request.auth.uid &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
         (!('description' in data) || (data.description is string && data.description.size() <= 3000)) &&
         (!('priority' in data) || data.priority in ['low', 'medium', 'high', 'urgent']) &&
         (!('category' in data) || (data.category is string && data.category.size() <= 50)) &&
         (!('tags' in data) || (data.tags is list && data.tags.size() <= 15)) &&
         (!('subtasks' in data) || (data.subtasks is list && data.subtasks.size() <= 50)) &&
-        (!('screenshotUrl' in data) || (data.screenshotUrl is string && data.screenshotUrl.size() <= 500000)) &&
+        (!('screenshotUrl' in data) || (data.screenshotUrl is string && data.screenshotUrl.size() <= 1000000)) &&
         (!('order' in data) || data.order is number);
     }
 
@@ -63,8 +66,7 @@ service cloud.firestore {
         allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
         allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) &&
           incoming().ownerId == request.auth.uid &&
-          incoming().boardId == boardId &&
-          get(/databases/$(database)/documents/boards/$(boardId)).data.ownerId == request.auth.uid;
+          incoming().boardId == boardId;
         allow update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) &&
           existing().ownerId == request.auth.uid &&
           incoming().ownerId == existing().ownerId &&

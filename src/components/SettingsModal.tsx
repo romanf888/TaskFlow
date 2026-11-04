@@ -11,7 +11,9 @@ import {
   HardDrive, 
   Cloud, 
   Monitor,
-  ShieldCheck
+  ShieldCheck,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 
@@ -272,9 +274,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onOpenAut
                 <span className="text-slate-400">Canal de mise à jour</span>
                 <span className="text-white font-medium">GitHub Releases (Auto-Updater)</span>
               </div>
-              <div className="flex justify-between py-1">
+              <div className="flex justify-between py-1 border-b border-white/5">
                 <span className="text-slate-400">Format de documents</span>
                 <span className="text-white font-medium">Fichiers .taskflow</span>
+              </div>
+              <div className="flex items-center justify-between py-1 pt-1.5">
+                <span className="text-slate-400 flex items-center space-x-1.5">
+                  <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Version Web (GitHub Pages)</span>
+                </span>
+                <a
+                  href="https://romanf888.github.io/TaskFlow/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 hover:text-blue-300 font-medium flex items-center space-x-1 hover:underline"
+                >
+                  <span>romanf888.github.io/TaskFlow</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
             </div>
           </div>

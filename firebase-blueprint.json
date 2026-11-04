@@ -40,6 +40,15 @@
           "type": "string",
           "format": "date-time",
           "description": "Last update timestamp"
+        },
+        "id": {
+          "type": "string",
+          "description": "Document ID of the board",
+          "maxLength": 128
+        },
+        "isCloud": {
+          "type": "boolean",
+          "description": "Whether board is synced with cloud"
         }
       },
       "required": ["title", "ownerId"]
@@ -111,6 +120,11 @@
           "type": "string",
           "format": "date-time",
           "description": "Last update timestamp"
+        },
+        "id": {
+          "type": "string",
+          "description": "Document ID of the task",
+          "maxLength": 128
         }
       },
       "required": ["title", "status", "boardId", "ownerId"]

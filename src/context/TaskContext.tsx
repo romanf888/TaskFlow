@@ -80,6 +80,27 @@ const LOCAL_STORAGE_BOARDS_KEY = 'taskflow_windows_boards_v1';
 const LOCAL_STORAGE_TASKS_KEY = 'taskflow_windows_tasks_v1';
 const LOCAL_STORAGE_ACTIVE_BOARD_KEY = 'taskflow_windows_active_board_v1';
 
+// Strips undefined fields recursively to prevent Firestore "Unsupported field value: undefined" errors
+function cleanFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
+  const cleaned: Record<string, any> = {};
+  for (const [key, val] of Object.entries(data)) {
+    if (val !== undefined) {
+      if (Array.isArray(val)) {
+        cleaned[key] = val.map((item) =>
+          typeof item === 'object' && item !== null && !(item instanceof Date)
+            ? cleanFirestoreData(item)
+            : item
+        );
+      } else if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
+        cleaned[key] = cleanFirestoreData(val);
+      } else {
+        cleaned[key] = val;
+      }
+    }
+  }
+  return cleaned;
+}
+
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -201,7 +222,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isCloud: true,
                 updatedAt: new Date().toISOString(),
               };
-              await setDoc(doc(db, boardsPath, cleanBoard.id), cleanBoard);
+              await setDoc(doc(db, boardsPath, cleanBoard.id), cleanFirestoreData(cleanBoard));
             }
             // Also upload initial tasks
             for (const t of INITIAL_TASKS) {
@@ -210,7 +231,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ownerId: user.uid,
                 updatedAt: new Date().toISOString(),
               };
-              await setDoc(doc(db, `boards/${cleanTask.boardId}/tasks`, cleanTask.id), cleanTask);
+              await setDoc(doc(db, `boards/${cleanTask.boardId}/tasks`, cleanTask.id), cleanFirestoreData(cleanTask));
             }
           } catch (err) {
             handleFirestoreError(err, OperationType.WRITE, boardsPath);
@@ -346,7 +367,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) {
       try {
         setSyncStatus('syncing');
-        await setDoc(doc(db, 'boards', newId), newBoard);
+        await setDoc(doc(db, 'boards', newId), cleanFirestoreData(newBoard));
         setSyncStatus('synced');
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `boards/${newId}`);
@@ -366,7 +387,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         setSyncStatus('syncing');
         const boardRef = doc(db, 'boards', boardId);
-        await setDoc(boardRef, { ...updates, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(boardRef, cleanFirestoreData({ ...updates, updatedAt: new Date().toISOString() }), { merge: true });
         setSyncStatus('synced');
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `boards/${boardId}`);
@@ -469,9 +490,9 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (user) {
         setSyncStatus('syncing');
-        await setDoc(doc(db, 'boards', importedBoardId), newBoard);
+        await setDoc(doc(db, 'boards', importedBoardId), cleanFirestoreData(newBoard));
         for (const t of importedTasks) {
-          await setDoc(doc(db, `boards/${importedBoardId}/tasks`, t.id), t);
+          await setDoc(doc(db, `boards/${importedBoardId}/tasks`, t.id), cleanFirestoreData(t));
         }
         setSyncStatus('synced');
       }
@@ -515,7 +536,17 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) {
       try {
         setSyncStatus('syncing');
-        await setDoc(doc(db, `boards/${currentBoardId}/tasks`, taskId), newTask);
+        // Ensure parent board document exists in Firestore
+        const targetBoard = boards.find((b) => b.id === currentBoardId);
+        if (targetBoard) {
+          await setDoc(doc(db, 'boards', currentBoardId), cleanFirestoreData({
+            ...targetBoard,
+            ownerId: user.uid,
+            isCloud: true,
+            updatedAt: new Date().toISOString()
+          }), { merge: true });
+        }
+        await setDoc(doc(db, `boards/${currentBoardId}/tasks`, taskId), cleanFirestoreData(newTask));
         setSyncStatus('synced');
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `boards/${currentBoardId}/tasks/${taskId}`);
@@ -542,7 +573,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         setSyncStatus('syncing');
         const taskRef = doc(db, `boards/${targetTask.boardId}/tasks`, taskId);
-        await setDoc(taskRef, updatedTask, { merge: true });
+        await setDoc(taskRef, cleanFirestoreData(updatedTask), { merge: true });
         setSyncStatus('synced');
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `boards/${targetTask.boardId}/tasks/${taskId}`);
