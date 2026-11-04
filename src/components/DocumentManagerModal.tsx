@@ -102,22 +102,24 @@ export const DocumentManagerModal: React.FC<DocumentManagerModalProps> = ({ onCl
       />
 
       <div 
-        className="w-full max-w-2xl bg-[#171b28] border border-white/15 rounded-xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh]"
+        className="w-full max-w-2xl bg-[#1e1f20] border border-white/15 rounded-3xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-3.5 bg-[#1e2334] border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Layers className="w-4 h-4 text-blue-400" />
-            <h3 className="text-sm font-bold text-white tracking-wide">
-              Gestionnaire de Documents de Tâches (.taskflow)
+        <div className="px-6 py-4 bg-[#191a1b] border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-7 h-7 rounded-full bg-[#4285F4]/20 text-[#8ab4f8] flex items-center justify-center">
+              <Layers className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-bold text-white tracking-tight">
+              Gestionnaire d'Espaces & Projets (.taskflow)
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 

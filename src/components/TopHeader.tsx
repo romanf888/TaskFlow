@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Menu, 
   Plus, 
@@ -9,18 +9,16 @@ import {
   Cloud, 
   CloudCheck, 
   RotateCw, 
-  Layers, 
-  Sparkles,
-  HelpCircle,
-  Briefcase,
-  Home,
-  Code,
-  Rocket,
-  Star,
-  Folder,
-  Settings
+  Settings,
+  Grip,
+  FolderOpen,
+  Check,
+  ExternalLink,
+  ChevronDown
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
+import { useSettings } from '../context/SettingsContext';
+import { TaskFlowLogo } from './TaskFlowLogo';
 
 interface TopHeaderProps {
   onToggleSidebar: () => void;
@@ -40,8 +38,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenSettingsModal,
 }) => {
   const {
+    boards,
     activeBoard,
     activeBoardId,
+    setActiveBoardId,
     searchQuery,
     setSearchQuery,
     selectedCategory,
@@ -51,179 +51,219 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     exportBoardToFile,
     user,
     syncStatus,
-    notificationMessage,
   } = useTaskContext();
 
-  const getBoardIcon = (iconName?: string, color: string = '#3b82f6') => {
-    switch (iconName) {
-      case 'briefcase':
-        return <Briefcase className="w-5 h-5" style={{ color }} />;
-      case 'home':
-        return <Home className="w-5 h-5" style={{ color }} />;
-      case 'code':
-        return <Code className="w-5 h-5" style={{ color }} />;
-      case 'rocket':
-        return <Rocket className="w-5 h-5" style={{ color }} />;
-      case 'star':
-        return <Star className="w-5 h-5" style={{ color }} />;
-      default:
-        return <Folder className="w-5 h-5" style={{ color }} />;
-    }
-  };
+  const { preferences, accentColorHex, getRoundedClass } = useSettings();
+  const [showAppsMenu, setShowAppsMenu] = useState(false);
+  const [showDocPicker, setShowDocPicker] = useState(false);
 
-  const activeColor = activeBoard?.color || '#3b82f6';
+  const activeColor = activeBoard?.color || '#4285F4';
 
   return (
-    <header className="bg-[#141724]/95 backdrop-blur-md border-b border-white/10 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs z-20 select-none shadow-md">
-      {/* Left: Sidebar Toggle & Active Document Info */}
-      <div className="flex items-center space-x-3 min-w-[200px]">
+    <header className="bg-[#1e1f20] border-b border-white/10 px-4 py-2.5 flex items-center justify-between gap-3 text-xs z-20 select-none shadow-md">
+      {/* Left: Hamburger menu + Google TaskFlow Logo + Document badge */}
+      <div className="flex items-center space-x-2 shrink-0">
         <button
           onClick={onToggleSidebar}
-          className={`p-2 rounded-lg transition-colors cursor-pointer ${
-            isSidebarOpen 
-              ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' 
-              : 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
-          }`}
-          title={isSidebarOpen ? "Masquer le panneau des documents" : "Afficher les documents (Pro / Perso)"}
+          className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+          title={isSidebarOpen ? "Réduire le panneau latéral" : "Ouvrir le panneau latéral"}
         >
-          <Menu className="w-4 h-4" />
+          <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center space-x-2.5 truncate">
-          <div 
-            className="p-1.5 rounded-lg shrink-0 flex items-center justify-center shadow-sm"
-            style={{ backgroundColor: `${activeColor}20` }}
+        {/* Google 4-Color TaskFlow Logo */}
+        <div className="cursor-pointer" onClick={() => onOpenAboutModal()}>
+          <TaskFlowLogo size={30} showText={true} />
+        </div>
+
+        {/* Current Document Pill (Google Drive / Docs style) */}
+        <div className="relative hidden sm:block ml-2">
+          <button
+            onClick={() => setShowDocPicker(!showDocPicker)}
+            className="flex items-center space-x-2 bg-[#282a2d] hover:bg-[#323639] border border-white/10 px-3 py-1.5 rounded-full text-slate-200 transition-all cursor-pointer shadow-sm group"
           >
-            {getBoardIcon(activeBoard?.icon, activeColor)}
-          </div>
-          <div className="truncate">
-            <div className="flex items-center space-x-2">
-              <h2 className="font-bold text-sm text-white truncate tracking-tight">
-                {activeBoard?.title || 'Mon Document'}
-              </h2>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-slate-400 font-mono">
-                .taskflow
-              </span>
+            <span 
+              className="w-2.5 h-2.5 rounded-full shrink-0 group-hover:scale-125 transition-transform" 
+              style={{ backgroundColor: activeColor }} 
+            />
+            <span className="font-medium max-w-[140px] truncate text-white text-xs">
+              {activeBoard?.title || 'Document'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+          </button>
+
+          {showDocPicker && (
+            <div 
+              className="absolute left-0 top-10 w-64 bg-[#282a2d] border border-white/15 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in"
+              onClick={() => setShowDocPicker(false)}
+            >
+              <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-3 py-1.5">
+                Projets & Documents
+              </div>
+              <div className="space-y-1 max-h-56 overflow-y-auto">
+                {boards.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => setActiveBoardId(b.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      b.id === activeBoardId
+                        ? 'bg-[#4285F4]/20 text-[#8ab4f8] font-semibold border border-[#4285F4]/30'
+                        : 'text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2.5 truncate">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: b.color || '#4285F4' }} />
+                      <span className="truncate">{b.title}</span>
+                    </div>
+                    {b.id === activeBoardId && <Check className="w-3.5 h-3.5 text-[#4285F4] shrink-0" />}
+                  </button>
+                ))}
+              </div>
             </div>
-            {activeBoard?.description && (
-              <p className="text-[11px] text-slate-400 truncate max-w-xs">
-                {activeBoard.description}
-              </p>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Center: Search & Quick Category Filter */}
-      <div className="flex items-center space-x-2 flex-1 max-w-xl mx-2">
-        {/* Search Input */}
-        <div className="relative flex-1 min-w-[150px]">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+      {/* Center: Google Search Pill */}
+      <div className="flex-1 max-w-xl mx-2">
+        <div className="relative flex items-center">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher une tâche, tag..."
-            className="w-full bg-[#1b2030] border border-white/10 focus:border-blue-500 rounded-lg pl-8 pr-7 py-1.5 text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+            placeholder="Rechercher des tâches, étiquettes ou projets..."
+            className="w-full bg-[#282a2d] hover:bg-[#303134] focus:bg-[#303134] border border-transparent focus:border-[#4285F4]/50 rounded-full pl-10 pr-9 py-2 text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-[#4285F4]/30 shadow-inner transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 rounded-full hover:bg-white/10"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
-
-        {/* Categories Pills */}
-        <div className="hidden md:flex items-center space-x-1 overflow-x-auto py-1">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
-              selectedCategory === 'all'
-                ? 'bg-white/15 text-white font-semibold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-            }`}
-          >
-            Toutes
-          </button>
-          {categories.slice(0, 4).map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(selectedCategory === cat.name ? 'all' : cat.name)}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                selectedCategory === cat.name
-                  ? `${cat.badgeClass} ring-1 ring-white/20 font-bold`
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Right: Quick Actions & Primary "+ Nouvelle Tâche" */}
-      <div className="flex items-center space-x-2">
-        {/* Save button */}
+      {/* Right: Google Workspace Icons, Settings, User & + Nouvelle tâche */}
+      <div className="flex items-center space-x-1.5 shrink-0">
+        {/* Save local document button */}
         <button
           onClick={saveCurrentDocument}
-          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-emerald-400 border border-white/10 transition-colors cursor-pointer"
-          title="Sauvegarder les modifications locales (Ctrl+S)"
+          className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-emerald-400 transition-colors cursor-pointer"
+          title="Sauvegarder les modifications (Ctrl+S)"
         >
           <Save className="w-4 h-4" />
         </button>
 
-        {/* Export .taskflow button */}
+        {/* Export .taskflow */}
         <button
           onClick={() => exportBoardToFile(activeBoardId)}
-          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-sky-300 border border-white/10 transition-colors cursor-pointer"
-          title="Télécharger le fichier .taskflow sur votre ordinateur"
+          className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-[#8ab4f8] transition-colors cursor-pointer"
+          title="Exporter le document (.taskflow)"
         >
           <Download className="w-4 h-4" />
         </button>
 
-        {/* Settings & Auto-Updates button */}
+        {/* Settings button */}
         {onOpenSettingsModal && (
           <button
             onClick={onOpenSettingsModal}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
-            title="Paramètres & Mises à jour du logiciel"
+            className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title="Paramètres de l'application"
           >
             <Settings className="w-4 h-4" />
           </button>
         )}
 
-        {/* Cloud sync button / status */}
+        {/* Google 9-dots App Launcher */}
+        <div className="relative">
+          <button
+            onClick={() => setShowAppsMenu(!showAppsMenu)}
+            className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title="Applications & Raccourcis TaskFlow"
+          >
+            <Grip className="w-4 h-4" />
+          </button>
+
+          {showAppsMenu && (
+            <div 
+              className="absolute right-0 top-11 w-72 bg-[#282a2d] border border-white/15 rounded-3xl shadow-2xl p-4 z-50 animate-in fade-in"
+              onClick={() => setShowAppsMenu(false)}
+            >
+              <div className="flex items-center space-x-2 pb-3 border-b border-white/10 mb-3">
+                <TaskFlowLogo size={24} showText={false} />
+                <span className="font-semibold text-white text-xs">Services TaskFlow</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <a
+                  href="https://romanf888.github.io/TaskFlow/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-3 bg-[#1e1f20] hover:bg-[#323639] border border-white/10 rounded-2xl flex flex-col items-center justify-center space-y-1.5 transition-colors cursor-pointer text-slate-200"
+                >
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <Cloud className="w-4 h-4" />
+                  </div>
+                  <span className="text-[11px] font-medium">Version Web</span>
+                  <span className="text-[9px] text-slate-400">GitHub Pages</span>
+                </a>
+
+                <a
+                  href="https://github.com/romanf888/TaskFlow"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-3 bg-[#1e1f20] hover:bg-[#323639] border border-white/10 rounded-2xl flex flex-col items-center justify-center space-y-1.5 transition-colors cursor-pointer text-slate-200"
+                >
+                  <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                    <ExternalLink className="w-4 h-4" />
+                  </div>
+                  <span className="text-[11px] font-medium">Releases .exe</span>
+                  <span className="text-[9px] text-slate-400">Mises à jour</span>
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Google Profile / Cloud Auth Button */}
         <button
           onClick={onOpenAuthModal}
-          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-all cursor-pointer ${
-            user
-              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25'
-              : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'
-          }`}
-          title={user ? `Synchronisé avec ${user.email}` : "Connecter Google Cloud pour synchroniser"}
+          className="flex items-center space-x-1.5 p-1 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+          title={user ? `Connecté avec ${user.email} (Cloud Synced)` : "Se connecter avec un compte Google"}
         >
-          {syncStatus === 'syncing' ? (
-            <RotateCw className="w-3.5 h-3.5 animate-spin text-blue-400" />
-          ) : user ? (
-            <CloudCheck className="w-3.5 h-3.5 text-emerald-400" />
+          {user ? (
+            <div className="relative">
+              {user.photoURL ? (
+                <img 
+                  src={user.photoURL} 
+                  alt={user.displayName || 'Utilisateur'} 
+                  className="w-7 h-7 rounded-full border-2 border-[#34A853]" 
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-[#4285F4] text-white flex items-center justify-center text-xs font-bold border border-white/20">
+                  {user.email ? user.email[0].toUpperCase() : 'G'}
+                </div>
+              )}
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#34A853] border-2 border-[#1e1f20]" />
+            </div>
           ) : (
-            <Cloud className="w-3.5 h-3.5 text-blue-400" />
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#4285F4]/20 border border-[#4285F4]/40 text-[#8ab4f8] text-xs font-medium hover:bg-[#4285F4]/30 transition-all">
+              <Cloud className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Connexion</span>
+            </div>
           )}
-          <span className="hidden sm:inline">
-            {user ? 'Cloud Sync' : 'Connexion Google'}
-          </span>
         </button>
 
-        {/* Primary Colorful Button: + Nouvelle Tâche */}
+        {/* Google FAB Style "+ Créer" Button */}
         <button
           onClick={onOpenNewTaskModal}
-          className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg font-bold text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 shadow-md shadow-blue-500/30 hover:shadow-cyan-500/30 active:scale-95 transition-all cursor-pointer text-xs"
+          className="flex items-center space-x-2 px-4 py-2 rounded-full font-semibold text-white bg-[#4285F4] hover:bg-[#3367d6] shadow-md shadow-[#4285F4]/30 active:scale-95 transition-all cursor-pointer text-xs ml-1"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Nouvelle tâche</span>
+          <span className="hidden md:inline font-sans">Créer</span>
         </button>
       </div>
     </header>

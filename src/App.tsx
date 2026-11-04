@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TaskProvider, useTaskContext } from './context/TaskContext';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -16,9 +17,9 @@ import {
   CloudCheck, 
   RotateCw, 
   HardDrive, 
-  FileText, 
   CheckCircle2, 
-  Layers 
+  Plus,
+  Sparkles
 } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
@@ -29,6 +30,8 @@ const MainAppContent: React.FC = () => {
     saveCurrentDocument,
     user 
   } = useTaskContext();
+
+  const { preferences, accentColorHex } = useSettings();
 
   // Sidebar toggle state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -46,7 +49,6 @@ const MainAppContent: React.FC = () => {
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Ctrl/Cmd keys
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't') {
         e.preventDefault();
         setNewTaskInitialStatus('todo');
@@ -81,9 +83,16 @@ const MainAppContent: React.FC = () => {
   const inProgressCount = tasks.filter((t) => t.status === 'in_progress').length;
   const todoCount = tasks.filter((t) => t.status === 'todo').length;
 
+  // Background style based on preferences
+  const bgClass = preferences.surfaceTheme === 'eclipse-dark' 
+    ? 'bg-[#0c0e15]' 
+    : preferences.surfaceTheme === 'material-light' 
+    ? 'bg-[#f8f9fa] text-slate-800' 
+    : 'bg-[#131314] text-[#e3e3e3]';
+
   return (
-    <div className="flex h-screen w-screen bg-[#0c0e15] text-slate-100 overflow-hidden font-sans">
-      {/* 1. Left Sidebar: Document Switcher menu (1-click to switch projects) */}
+    <div className={`flex h-screen w-screen ${bgClass} overflow-hidden font-sans select-none relative`}>
+      {/* 1. Left Sidebar: Google Navigation Drawer */}
       <Sidebar
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -93,8 +102,8 @@ const MainAppContent: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        {/* 2. Top Header (Clean, fast search, category pills, save, + Nouvelle tâche) */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0 relative">
+        {/* 2. Top Header: Google App Bar with Search Pill and Services */}
         <TopHeader
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           isSidebarOpen={isSidebarOpen}
@@ -113,30 +122,30 @@ const MainAppContent: React.FC = () => {
           onOpenNewTaskModalForStatus={handleOpenNewTaskForStatus}
         />
 
-        {/* 4. Minimal Bottom Status Bar */}
-        <footer className="h-6 bg-[#10131e] border-t border-white/10 px-4 flex items-center justify-between text-[11px] text-slate-400 select-none shrink-0">
+        {/* 4. Minimal Google Workspace Bottom Status Bar */}
+        <footer className="h-7 bg-[#1e1f20] border-t border-white/10 px-4 flex items-center justify-between text-[11px] text-slate-400 select-none shrink-0">
           <div className="flex items-center space-x-3 truncate">
-            <span className="flex items-center space-x-1 text-slate-300">
+            <span className="flex items-center space-x-1.5 text-slate-200">
               <span 
                 className="w-2 h-2 rounded-full inline-block"
-                style={{ backgroundColor: activeBoard?.color || '#3b82f6' }}
+                style={{ backgroundColor: activeBoard?.color || '#4285F4' }}
               />
-              <span className="font-medium truncate">{activeBoard?.title || 'Document actif'}</span>
+              <span className="font-semibold truncate">{activeBoard?.title || 'Espace actif'}</span>
             </span>
             <span className="text-slate-600">|</span>
             <span>{tasks.length} tâche{tasks.length > 1 ? 's' : ''}</span>
             <span className="text-slate-600 hidden sm:inline">|</span>
-            <span className="hidden sm:inline text-amber-400">{todoCount} à faire</span>
-            <span className="hidden sm:inline text-blue-400">{inProgressCount} en cours</span>
-            <span className="hidden sm:inline text-emerald-400">{doneCount} terminée{doneCount > 1 ? 's' : ''}</span>
+            <span className="hidden sm:inline text-[#FBBC04]">{todoCount} à faire</span>
+            <span className="hidden sm:inline text-[#4285F4]">{inProgressCount} en cours</span>
+            <span className="hidden sm:inline text-[#34A853]">{doneCount} terminée{doneCount > 1 ? 's' : ''}</span>
           </div>
 
           <div className="flex items-center space-x-3 shrink-0">
             <div className="flex items-center space-x-1.5">
               {user ? (
-                <span className="flex items-center space-x-1 text-emerald-400">
+                <span className="flex items-center space-x-1 text-[#34A853] font-medium">
                   <CloudCheck className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Google Cloud Synced</span>
+                  <span className="hidden md:inline">Google Cloud Sync</span>
                 </span>
               ) : (
                 <span className="flex items-center space-x-1 text-slate-400">
@@ -148,25 +157,37 @@ const MainAppContent: React.FC = () => {
             <span className="text-slate-600">|</span>
             <button
               onClick={() => setIsSettingsModalOpen(true)}
-              className="hover:text-blue-400 transition-colors cursor-pointer flex items-center space-x-1"
-              title="Vérifier les mises à jour logicielles"
+              className="hover:text-[#8ab4f8] transition-colors cursor-pointer flex items-center space-x-1"
+              title="Paramètres de l'application"
             >
-              <RotateCw className="w-3 h-3 text-cyan-400" />
-              <span>Mises à jour</span>
+              <RotateCw className="w-3 h-3 text-[#4285F4]" />
+              <span>Paramètres</span>
             </button>
             <span className="text-slate-600">|</span>
             <button
               onClick={() => setIsAboutModalOpen(true)}
-              className="hover:text-blue-400 transition-colors cursor-pointer"
+              className="hover:text-[#8ab4f8] transition-colors cursor-pointer"
             >
-              Raccourcis & Aide
+              Raccourcis
             </button>
           </div>
         </footer>
+
+        {/* Google Floating Action Button (FAB) in bottom right corner */}
+        <button
+          onClick={() => {
+            setNewTaskInitialStatus('todo');
+            setIsNewTaskModalOpen(true);
+          }}
+          className="absolute right-6 bottom-10 z-20 flex items-center space-x-2 px-5 py-3 rounded-full font-semibold text-white bg-[#4285F4] hover:bg-[#3367d6] shadow-xl shadow-[#4285F4]/40 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          title="Créer une nouvelle tâche (Ctrl+T)"
+        >
+          <Plus className="w-5 h-5 stroke-[2.5]" />
+          <span className="text-xs font-sans tracking-wide">Créer une tâche</span>
+        </button>
       </div>
 
       {/* Modals */}
-      {/* 1. Task Details Modal with Pencil Edit and Screenshot */}
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
@@ -175,7 +196,6 @@ const MainAppContent: React.FC = () => {
         />
       )}
 
-      {/* 2. New Task Modal */}
       {isNewTaskModalOpen && (
         <NewTaskModal
           initialStatus={newTaskInitialStatus}
@@ -183,21 +203,18 @@ const MainAppContent: React.FC = () => {
         />
       )}
 
-      {/* 3. Document / Projects Manager Modal (.taskflow) */}
       {isDocManagerOpen && (
         <DocumentManagerModal
           onClose={() => setIsDocManagerOpen(false)}
         />
       )}
 
-      {/* 4. Google Auth & Cloud Sync Modal */}
       {isAuthModalOpen && (
         <GoogleAuthModal
           onClose={() => setIsAuthModalOpen(false)}
         />
       )}
 
-      {/* 5. Screenshot Lightbox Modal */}
       {lightboxImage && (
         <ImageLightboxModal
           imageUrl={lightboxImage}
@@ -205,7 +222,6 @@ const MainAppContent: React.FC = () => {
         />
       )}
 
-      {/* 6. Settings & Updates Modal */}
       {isSettingsModalOpen && (
         <SettingsModal
           onClose={() => setIsSettingsModalOpen(false)}
@@ -213,14 +229,13 @@ const MainAppContent: React.FC = () => {
         />
       )}
 
-      {/* 7. About Modal */}
       {isAboutModalOpen && (
         <AboutModal
           onClose={() => setIsAboutModalOpen(false)}
         />
       )}
 
-      {/* 8. GitHub Auto-Update Notification Banner (Electron Desktop) */}
+      {/* GitHub Auto-Update Notification Banner (Electron Desktop) */}
       <UpdateNotification />
     </div>
   );
@@ -228,8 +243,10 @@ const MainAppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <TaskProvider>
-      <MainAppContent />
-    </TaskProvider>
+    <SettingsProvider>
+      <TaskProvider>
+        <MainAppContent />
+      </TaskProvider>
+    </SettingsProvider>
   );
 }

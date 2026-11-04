@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, CheckSquare, Layers, Cloud, Sparkles, FileText, Keyboard } from 'lucide-react';
+import { X, Sparkles, Layers, Cloud, Globe, Keyboard, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { TaskFlowLogo } from './TaskFlowLogo';
 
 interface AboutModalProps {
   onClose: () => void;
@@ -8,86 +9,97 @@ interface AboutModalProps {
 export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in select-none"
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in select-none"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-[#171b28] border border-white/15 rounded-xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col"
+        className="w-full max-w-lg bg-[#1e1f20] border border-white/15 rounded-3xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 bg-[#1e2334] border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-5 h-5 rounded bg-blue-600 flex items-center justify-center text-white">
-              <CheckSquare className="w-3.5 h-3.5" />
-            </div>
-            <h3 className="text-sm font-bold text-white tracking-wide">
-              À propos de TaskFlow Windows
-            </h3>
-          </div>
+        {/* Header */}
+        <div className="px-6 py-4 bg-[#191a1b] border-b border-white/10 flex items-center justify-between">
+          <TaskFlowLogo size={32} showText={true} />
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4 text-xs overflow-y-auto max-h-[75vh]">
-          <div className="flex items-center space-x-3 p-3 bg-blue-600/10 rounded-lg border border-blue-500/20">
-            <div className="p-2 bg-blue-600 rounded-lg text-white">
-              <Sparkles className="w-5 h-5" />
-            </div>
+        {/* Content */}
+        <div className="p-6 space-y-4 text-xs overflow-y-auto max-h-[75vh]">
+          {/* Banner */}
+          <div className="flex items-center space-x-3.5 p-3.5 bg-[#282a2d] rounded-2xl border border-white/10">
+            <TaskFlowLogo size={36} showText={false} />
             <div>
-              <h4 className="font-bold text-white text-sm">TaskFlow pour Windows 11</h4>
-              <p className="text-slate-400 text-xs">
-                Gestionnaire de tâches moderne avec interface Fluent Design, mode sombre natif et glisser-déposer fluide.
+              <h4 className="font-bold text-white text-sm">TaskFlow Workspace</h4>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Gestionnaire de tâches moderne avec interface inspirée du design Google Material You, synchronisation cloud en direct et multi-projets.
               </p>
             </div>
           </div>
 
+          {/* Points forts */}
           <div className="space-y-2">
-            <h5 className="font-semibold text-slate-300">Conformité au cahier des charges :</h5>
-            <ul className="space-y-1.5 text-slate-300 list-disc list-inside bg-black/20 p-3 rounded-lg border border-white/5">
-              <li><strong>Tableau Kanban :</strong> Colonnes ciblées "À faire", "En cours", "Fait" sans calendrier encombrant.</li>
-              <li><strong>Compte Google & Cloud :</strong> Synchronisation temps réel automatique multi-appareils via Firestore.</li>
-              <li><strong>Mode Sombre :</strong> Thème Windows sombre élégant avec micro-animations de glisser-déposer.</li>
-              <li><strong>Sous-tâches & Tags :</strong> Checklist interactive avec barre de progression et catégories personnalisées.</li>
-              <li><strong>Détails & Illustrations :</strong> Menu détaillé complet, captures d'écran zoomables et crayon d'édition rapide en haut à droite.</li>
-              <li><strong>Système de fichiers :</strong> Gestionnaire de plusieurs documents séparés (.taskflow) pour organiser vos projets pro et perso.</li>
-            </ul>
+            <h5 className="font-semibold text-slate-200">Fonctionnalités clés :</h5>
+            <div className="space-y-2 text-slate-300 bg-[#282a2d]/60 p-3.5 rounded-2xl border border-white/5">
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#FBBC04] shrink-0 mt-0.5" />
+                <span><strong>Kanban cerné :</strong> 3 colonnes essentielles ("À faire", "En cours", "Fait") avec glisser-déposer fluide.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#4285F4] shrink-0 mt-0.5" />
+                <span><strong>Style Google Material You :</strong> Bords ultra-arrondis, barre de recherche en pilule, et thème sombre doux.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#34A853] shrink-0 mt-0.5" />
+                <span><strong>Multi-appareils & Cloud :</strong> Synchronisation temps réel automatique via Firebase Firestore avec votre compte Google.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#EA4335] shrink-0 mt-0.5" />
+                <span><strong>Multi-projets (.taskflow) :</strong> Gestion de plusieurs documents séparés pour scinder projets pro et personnels.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#8ab4f8] shrink-0 mt-0.5" />
+                <span><strong>Déploiement simultané :</strong> Disponible en application de bureau Windows (.exe) et en version Web complète (GitHub Pages).</span>
+              </div>
+            </div>
           </div>
 
+          {/* Raccourcis clavier */}
           <div className="space-y-2">
-            <h5 className="font-semibold text-slate-300 flex items-center space-x-1.5">
-              <Keyboard className="w-4 h-4 text-amber-400" />
-              <span>Raccourcis clavier pratiques :</span>
+            <h5 className="font-semibold text-slate-200 flex items-center space-x-1.5">
+              <Keyboard className="w-4 h-4 text-[#8ab4f8]" />
+              <span>Raccourcis clavier pratiques</span>
             </h5>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="p-2 rounded bg-white/5 flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-[#282a2d] border border-white/5 flex justify-between items-center">
                 <span className="text-slate-400">Nouvelle tâche</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-black/40 font-mono text-white">Ctrl+T</kbd>
+                <kbd className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 font-mono text-white text-[10px]">Ctrl + T</kbd>
               </div>
-              <div className="p-2 rounded bg-white/5 flex items-center justify-between">
+              <div className="p-2.5 rounded-xl bg-[#282a2d] border border-white/5 flex justify-between items-center">
                 <span className="text-slate-400">Nouveau document</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-black/40 font-mono text-white">Ctrl+N</kbd>
+                <kbd className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 font-mono text-white text-[10px]">Ctrl + N</kbd>
               </div>
-              <div className="p-2 rounded bg-white/5 flex items-center justify-between">
-                <span className="text-slate-400">Enregistrer</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-black/40 font-mono text-white">Ctrl+S</kbd>
+              <div className="p-2.5 rounded-xl bg-[#282a2d] border border-white/5 flex justify-between items-center">
+                <span className="text-slate-400">Sauvegarder</span>
+                <kbd className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 font-mono text-white text-[10px]">Ctrl + S</kbd>
               </div>
-              <div className="p-2 rounded bg-white/5 flex items-center justify-between">
-                <span className="text-slate-400">Coller capture d'écran</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-black/40 font-mono text-white">Ctrl+V</kbd>
+              <div className="p-2.5 rounded-xl bg-[#282a2d] border border-white/5 flex justify-between items-center">
+                <span className="text-slate-400">Fermer la boîte</span>
+                <kbd className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 font-mono text-white text-[10px]">Échap</kbd>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="px-5 py-3 bg-[#1e2334] border-t border-white/10 flex items-center justify-between">
-          <span className="text-[11px] text-slate-500">Version 1.0.0 - Windows Edition</span>
+        {/* Footer */}
+        <div className="px-6 py-3.5 bg-[#191a1b] border-t border-white/10 flex items-center justify-between">
+          <span className="text-[11px] text-slate-500">TaskFlow Workspace v1.0.6</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-medium"
+            className="px-5 py-2 bg-white/10 hover:bg-white/15 text-white rounded-full text-xs font-semibold transition-colors cursor-pointer"
           >
             Fermer
           </button>

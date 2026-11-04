@@ -108,11 +108,11 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in"
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in"
       onClick={onClose}
     >
       <div 
-        className="w-full max-w-xl bg-[#171b28] border border-white/15 rounded-xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh]"
+        className="w-full max-w-xl bg-[#1e1f20] border border-white/15 rounded-3xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <input 
@@ -124,18 +124,20 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
         />
 
         {/* Modal Header */}
-        <div className="px-5 py-3.5 bg-[#1e2334] border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Plus className="w-4 h-4 text-blue-400" />
-            <h3 className="text-sm font-bold text-white tracking-wide">
-              Nouvelle Tâche
+        <div className="px-6 py-4 bg-[#191a1b] border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-7 h-7 rounded-full bg-[#4285F4]/20 text-[#8ab4f8] flex items-center justify-center">
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <h3 className="text-sm font-bold text-white tracking-tight">
+              Nouvelle Tâche Workspace
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -344,17 +346,17 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
           </div>
 
           {/* Footer Submit */}
-          <div className="pt-3 border-t border-white/10 flex items-center justify-end space-x-2">
+          <div className="pt-4 border-t border-white/10 flex items-center justify-end space-x-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-slate-300 rounded text-xs"
+              className="px-4 py-2 bg-white/10 hover:bg-white/15 text-slate-300 rounded-full text-xs font-medium cursor-pointer transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded text-xs shadow-md shadow-blue-600/30"
+              className="px-5 py-2 bg-[#4285F4] hover:bg-[#3367d6] text-white font-semibold rounded-full text-xs shadow-md shadow-[#4285F4]/30 cursor-pointer transition-all active:scale-95"
             >
               Créer la tâche
             </button>

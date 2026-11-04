@@ -11,19 +11,17 @@ import {
   Upload, 
   Cloud, 
   CloudCheck, 
-  CloudOff, 
-  RotateCw, 
   Trash2, 
   Edit2, 
   Check, 
   Layers, 
-  CheckSquare, 
-  Sparkles,
-  ChevronRight,
-  HardDrive,
-  Settings
+  Settings,
+  HelpCircle,
+  FolderPlus
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
+import { useSettings } from '../context/SettingsContext';
+import { TaskFlowLogo } from './TaskFlowLogo';
 import { Task } from '../types/task';
 
 interface SidebarProps {
@@ -54,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     syncStatus,
   } = useTaskContext();
 
+  const { preferences, accentColorHex } = useSettings();
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -66,8 +65,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const getBoardIcon = (iconName?: string, color: string = '#3b82f6') => {
-    const className = "w-4 h-4 shrink-0 transition-transform group-hover:scale-110";
+  const getBoardIcon = (iconName?: string, color: string = '#4285F4') => {
+    const className = "w-4 h-4 shrink-0";
     switch (iconName) {
       case 'briefcase':
         return <Briefcase className={className} style={{ color }} />;
@@ -95,71 +94,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className="hidden"
       />
 
-      {/* Sidebar Container */}
+      {/* Google Navigation Drawer */}
       <aside
         className={`${
           isOpen ? 'w-72' : 'w-0 -translate-x-full lg:w-0'
-        } transition-all duration-300 ease-in-out bg-[#121522] border-r border-white/10 flex flex-col shrink-0 overflow-hidden select-none z-30 shadow-2xl relative`}
+        } transition-all duration-300 ease-in-out bg-[#1e1f20] border-r border-white/10 flex flex-col shrink-0 overflow-hidden select-none z-30 shadow-xl relative`}
       >
         {/* Brand Header */}
-        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-[#161a2b]">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-md shadow-blue-500/30">
-              <CheckSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-sm font-extrabold text-white tracking-wide bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
-                TaskFlow
-              </h1>
-              <p className="text-[10px] text-blue-400 font-medium">
-                Gestionnaire de Tâches
-              </p>
-            </div>
-          </div>
+        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-[#191a1b]">
+          <TaskFlowLogo size={30} showText={true} />
         </div>
 
-        {/* Section: Documents / Fichiers de tâches (1-clic pour changer) */}
-        <div className="flex-1 p-3 overflow-y-auto space-y-1.5">
-          <div className="flex items-center justify-between px-2 pt-2 pb-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            <span className="flex items-center space-x-1.5 text-blue-400">
+        {/* Action: + Nouveau Projet (Google Keep FAB style pill) */}
+        <div className="p-3">
+          <button
+            onClick={onOpenNewDocModal}
+            className="w-full py-2.5 px-4 rounded-full bg-[#282a2d] hover:bg-[#323639] text-[#8ab4f8] hover:text-white border border-[#4285F4]/30 shadow-sm flex items-center justify-center space-x-2 text-xs font-semibold transition-all cursor-pointer group"
+          >
+            <Plus className="w-4 h-4 text-[#4285F4] group-hover:scale-110 transition-transform" />
+            <span>Nouveau document</span>
+          </button>
+        </div>
+
+        {/* Section: Documents / Projets */}
+        <div className="flex-1 px-3 py-1 overflow-y-auto space-y-1">
+          <div className="flex items-center justify-between px-3 pt-2 pb-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="flex items-center space-x-1.5 text-[#8ab4f8]">
               <Layers className="w-3.5 h-3.5" />
-              <span>Mes Fichiers / Documents</span>
+              <span>Vos Espaces & Projets</span>
             </span>
-            <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full text-slate-300">
+            <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-slate-300">
               {boards.length}
             </span>
           </div>
 
-          <p className="px-2 pb-2 text-[11px] text-slate-500">
-            Cliquez sur un document pour afficher son tableau Kanban :
-          </p>
-
-          {/* Document list */}
-          <div className="space-y-1.5">
+          {/* Document list with Google rounded-full / rounded-2xl pills */}
+          <div className="space-y-1 pt-1">
             {boards.map((board) => {
               const isActive = board.id === activeBoardId;
               const boardTasks = allTasks.filter((t: Task) => t.boardId === board.id);
               const doneTasks = boardTasks.filter((t: Task) => t.status === 'done').length;
-              const accentColor = board.color || '#3b82f6';
+              const accentColor = board.color || '#4285F4';
 
               return (
                 <div
                   key={board.id}
                   onClick={() => setActiveBoardId(board.id)}
-                  style={{
-                    borderLeftColor: isActive ? accentColor : 'transparent',
-                  }}
-                  className={`group relative flex items-center justify-between p-2.5 rounded-lg border-l-4 transition-all duration-150 cursor-pointer ${
+                  className={`group relative flex items-center justify-between px-3 py-2.5 rounded-2xl transition-all duration-150 cursor-pointer ${
                     isActive
-                      ? 'bg-[#1e2438] text-white shadow-md shadow-black/30 border-t border-r border-b border-white/10 ring-1 ring-white/10'
-                      : 'bg-[#151928]/60 hover:bg-[#1b2033] text-slate-300 hover:text-white border-transparent'
+                      ? 'bg-[#004a77]/40 text-white font-medium border border-[#4285F4]/40 shadow-sm'
+                      : 'hover:bg-[#282a2d] text-slate-300 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center space-x-2.5 truncate flex-1 min-w-0 pr-2">
+                  <div className="flex items-center space-x-3 truncate flex-1 min-w-0 pr-1">
                     <div 
-                      className="p-1.5 rounded-md shrink-0 flex items-center justify-center transition-colors"
+                      className="p-1.5 rounded-xl shrink-0 flex items-center justify-center"
                       style={{ 
-                        backgroundColor: isActive ? `${accentColor}25` : '#1a1f30',
+                        backgroundColor: isActive ? `${accentColor}30` : 'rgba(255, 255, 255, 0.05)',
                       }}
                     >
                       {getBoardIcon(board.icon, accentColor)}
@@ -175,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             type="text"
                             value={editTitle}
                             onChange={(e) => setEditTitle(e.target.value)}
-                            className="bg-[#242b3e] border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white w-full"
+                            className="bg-[#282a2d] border border-[#4285F4] rounded-lg px-2 py-0.5 text-xs text-white w-full outline-none"
                             autoFocus
                           />
                           <button
@@ -185,151 +176,119 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               }
                               setEditingBoardId(null);
                             }}
-                            className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-500"
+                            className="p-1 bg-[#34A853] text-white rounded-md hover:bg-emerald-600"
                           >
                             <Check className="w-3 h-3" />
                           </button>
                         </div>
                       ) : (
-                        <h4 className="font-semibold text-xs truncate">
-                          {board.title}
-                        </h4>
-                      )}
-
-                      <div className="flex items-center space-x-1.5 text-[10px] text-slate-400 mt-0.5">
-                        <span 
-                          className="font-medium"
-                          style={{ color: isActive ? accentColor : undefined }}
-                        >
-                          {boardTasks.length} tâche{boardTasks.length > 1 ? 's' : ''}
-                        </span>
-                        {boardTasks.length > 0 && (
-                          <>
-                            <span>•</span>
-                            <span className="text-emerald-400 font-medium">
-                              {doneTasks} faite{doneTasks > 1 ? 's' : ''}
+                        <div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-xs truncate font-medium">
+                              {board.title}
                             </span>
-                          </>
-                        )}
-                      </div>
+                            {board.isCloud && (
+                              <span title="Synchronisé dans Google Cloud">
+                                <CloudCheck className="w-3 h-3 text-[#34A853] shrink-0" />
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {boardTasks.length} tâche{boardTasks.length > 1 ? 's' : ''} ({doneTasks} terminées)
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Right actions: quick download or rename on hover */}
-                  <div 
-                    className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  {/* Hover Quick Actions */}
+                  <div className="hidden group-hover:flex items-center space-x-1 shrink-0 ml-1">
                     <button
-                      onClick={() => exportBoardToFile(board.id)}
-                      className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-sky-300 transition-colors"
-                      title="Télécharger ce document (.taskflow)"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setEditingBoardId(board.id);
                         setEditTitle(board.title);
                       }}
-                      className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                      title="Renommer le document"
+                      className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10"
+                      title="Renommer"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Edit2 className="w-3 h-3" />
                     </button>
                     {boards.length > 1 && (
                       <button
-                        onClick={() => {
-                          if (window.confirm(`Supprimer le document "${board.title}" ?`)) {
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Supprimer le document "${board.title}" ?`)) {
                             deleteBoard(board.id);
                           }
                         }}
-                        className="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
-                        title="Supprimer ce document"
+                        className="p-1 text-slate-400 hover:text-[#EA4335] rounded-lg hover:bg-white/10"
+                        title="Supprimer"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     )}
                   </div>
-
-                  {isActive && (
-                    <div 
-                      className="w-1.5 h-1.5 rounded-full shrink-0 ml-1.5"
-                      style={{ backgroundColor: accentColor }}
-                    />
-                  )}
                 </div>
               );
             })}
           </div>
-
-          {/* Add New Document button */}
-          <button
-            onClick={onOpenNewDocModal}
-            className="w-full mt-3 py-2 px-3 bg-gradient-to-r from-blue-600/30 to-indigo-600/30 hover:from-blue-600 hover:to-indigo-600 border border-blue-500/40 text-blue-300 hover:text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 transition-all shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Nouveau Document</span>
-          </button>
-
-          {/* Import file button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full mt-1.5 py-1.5 px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white rounded-lg text-xs flex items-center justify-center space-x-2 transition-colors cursor-pointer"
-          >
-            <Upload className="w-3.5 h-3.5 text-purple-400" />
-            <span>Ouvrir un fichier .taskflow</span>
-          </button>
         </div>
 
-        {/* Bottom User Profile & Cloud Sync Bar */}
-        <div className="p-3 border-t border-white/10 bg-[#161a2b]">
-          {user ? (
-            <div 
-              onClick={onOpenAuthModal}
-              className="flex items-center justify-between p-2 rounded-lg bg-black/30 hover:bg-black/50 border border-emerald-500/30 cursor-pointer transition-colors"
-              title="Gérer la synchronisation Google"
+        {/* Bottom Panel: Import / Export & Google Cloud Card */}
+        <div className="p-3 border-t border-white/10 bg-[#191a1b] space-y-2">
+          {/* Import / Export quick buttons */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 py-1.5 px-2 bg-[#282a2d] hover:bg-[#323639] border border-white/10 rounded-xl text-[11px] text-slate-300 hover:text-white flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+              title="Importer un fichier .taskflow existant"
             >
-              <div className="flex items-center space-x-2.5 truncate">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt="Avatar" className="w-7 h-7 rounded-full border border-emerald-400" />
+              <Upload className="w-3 h-3 text-[#FBBC05]" />
+              <span>Importer</span>
+            </button>
+            <button
+              onClick={() => exportBoardToFile(activeBoardId)}
+              className="flex-1 py-1.5 px-2 bg-[#282a2d] hover:bg-[#323639] border border-white/10 rounded-xl text-[11px] text-slate-300 hover:text-white flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+              title="Exporter le document actif"
+            >
+              <Download className="w-3 h-3 text-[#34A853]" />
+              <span>Exporter</span>
+            </button>
+          </div>
+
+          {/* User Cloud Card */}
+          <div 
+            onClick={onOpenAuthModal}
+            className="p-2.5 rounded-2xl bg-[#282a2d] border border-white/10 flex items-center justify-between cursor-pointer hover:bg-[#323639] transition-all"
+          >
+            <div className="flex items-center space-x-2.5 truncate">
+              {user ? (
+                user.photoURL ? (
+                  <img src={user.photoURL} alt="Avatar" className="w-7 h-7 rounded-full border border-[#34A853]" />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center">
-                    {user.email?.[0].toUpperCase()}
+                  <div className="w-7 h-7 rounded-full bg-[#4285F4] text-white flex items-center justify-center font-bold text-xs">
+                    {user.email ? user.email[0].toUpperCase() : 'G'}
                   </div>
-                )}
-                <div className="truncate text-left">
-                  <p className="font-semibold text-xs text-white truncate leading-tight">
-                    {user.displayName?.split(' ')[0] || user.email?.split('@')[0]}
-                  </p>
-                  <span className="flex items-center space-x-1 text-[10px] text-emerald-400 font-medium">
-                    <CloudCheck className="w-3 h-3" />
-                    <span>Cloud Sync Actif</span>
-                  </span>
+                )
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-white/10 text-slate-400 flex items-center justify-center">
+                  <Cloud className="w-3.5 h-3.5" />
                 </div>
+              )}
+              <div className="truncate">
+                <p className="text-xs font-semibold text-white truncate">
+                  {user ? (user.displayName || user.email?.split('@')[0]) : 'Mode Local'}
+                </p>
+                <p className="text-[10px] text-slate-400 truncate">
+                  {user ? 'Google Cloud Sync actif' : 'Connecter un compte'}
+                </p>
               </div>
-
-              <ChevronRight className="w-4 h-4 text-slate-500" />
             </div>
-          ) : (
-            <button
-              onClick={onOpenAuthModal}
-              className="w-full py-2 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
-            >
-              <Cloud className="w-3.5 h-3.5" />
-              <span>Connecter Google Cloud</span>
-            </button>
-          )}
-
-          {onOpenSettingsModal && (
-            <button
-              onClick={onOpenSettingsModal}
-              className="w-full mt-2 py-1.5 px-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg text-[11px] flex items-center justify-center space-x-2 transition-colors cursor-pointer"
-            >
-              <Settings className="w-3.5 h-3.5 text-slate-400" />
-              <span>Paramètres & Mises à jour</span>
-            </button>
-          )}
+            {user && (
+              <span className="w-2 h-2 rounded-full bg-[#34A853] shrink-0 shadow-sm" />
+            )}
+          </div>
         </div>
       </aside>
     </>

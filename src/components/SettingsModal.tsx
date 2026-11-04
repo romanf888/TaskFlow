@@ -10,12 +10,21 @@ import {
   Sparkles, 
   HardDrive, 
   Cloud, 
-  Monitor,
+  Monitor, 
   ShieldCheck,
   Globe,
-  ExternalLink
+  ExternalLink,
+  Palette,
+  Sliders,
+  Database,
+  Check,
+  Layers,
+  Eye,
+  CheckSquare
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
+import { useSettings, THEME_COLOR_MAP, ThemeColor, BorderRadiusStyle, DisplayDensity, DefaultSort, SurfaceTheme } from '../context/SettingsContext';
+import { TaskFlowLogo } from './TaskFlowLogo';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -25,29 +34,37 @@ interface SettingsModalProps {
 interface UpdaterStatusState {
   status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
   version?: string;
+  releaseDate?: string;
   percent?: number;
+  bytesPerSecond?: number;
+  transferred?: number;
+  total?: number;
   error?: string;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onOpenAuthModal }) => {
-  const { user, syncStatus } = useTaskContext();
-  const [appVersion, setAppVersion] = useState('1.0.1');
+export const SettingsModal: React.FC<SettingsModalProps> = ({ 
+  onClose, 
+  onOpenAuthModal 
+}) => {
+  const { user, syncStatus, lastSyncTime, boards, allTasks, saveCurrentDocument, exportBoardToFile, activeBoardId } = useTaskContext();
+  const { preferences, updatePreference, resetPreferences, accentColorHex, getRoundedClass } = useSettings();
+
+  const [activeTab, setActiveTab] = useState<'appearance' | 'tasks' | 'sync' | 'updates'>('appearance');
+  const [appVersion, setAppVersion] = useState('1.0.6');
   const [updaterState, setUpdaterState] = useState<UpdaterStatusState>({ status: 'idle' });
   const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
-    // Get app version if in Electron
     if (window.electronAPI?.getAppVersion) {
-      window.electronAPI.getAppVersion().then((ver) => {
-        if (ver) setAppVersion(ver);
-      }).catch(() => {});
+      window.electronAPI.getAppVersion().then((v) => {
+        if (v) setAppVersion(v);
+      });
     }
 
-    // Listen for updater status
     if (window.electronAPI?.onUpdaterStatus) {
-      const unsub = window.electronAPI.onUpdaterStatus((data) => {
+      const unsub = window.electronAPI.onUpdaterStatus((data: UpdaterStatusState) => {
         setUpdaterState(data);
-        if (data.status !== 'checking') {
+        if (data.status === 'not-available' || data.status === 'error' || data.status === 'downloaded') {
           setIsChecking(false);
         }
       });
@@ -79,7 +96,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onOpenAut
         });
       }
     } else {
-      // In web preview fallback
       setTimeout(() => {
         setIsChecking(false);
         setUpdaterState({
@@ -96,213 +112,454 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onOpenAut
     }
   };
 
+  const modalRounded = getRoundedClass('modal');
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in select-none"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-[#161a27] border border-white/15 rounded-xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col"
+        className={`w-full max-w-2xl bg-[#1e1f20] border border-white/15 ${modalRounded} shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh]`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="px-5 py-4 bg-[#1e2334] border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 rounded-md bg-blue-600/20 text-blue-400">
-              <Settings className="w-4 h-4" />
+        {/* Header with Google TaskFlow branding */}
+        <div className="px-6 py-4 bg-[#191a1b] border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <TaskFlowLogo size={28} showText={false} />
+            <div>
+              <h3 className="text-base font-semibold text-white tracking-tight">
+                Paramètres TaskFlow
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Personnalisez votre interface Google Workspace & synchronisation
+              </p>
             </div>
-            <h3 className="text-sm font-bold text-white tracking-wide">
-              Paramètres & Mises à jour
-            </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-5 space-y-5 text-xs overflow-y-auto max-h-[75vh]">
-          {/* Section: Mise à jour automatique */}
-          <div className="bg-[#1e2334] rounded-xl border border-white/10 p-4 space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-bold text-white text-sm flex items-center space-x-2">
-                  <span>Mises à jour du logiciel</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-600/20 text-blue-400 border border-blue-500/30">
-                    v{appVersion}
-                  </span>
-                </h4>
-                <p className="text-slate-400 text-[11px] mt-0.5">
-                  Vérifiez directement les nouvelles versions publiées sur GitHub sans devoir relancer l'application.
+        {/* Tab Navigation Pill Bar */}
+        <div className="px-6 pt-3 pb-2 border-b border-white/10 flex gap-2 overflow-x-auto bg-[#191a1b]/50">
+          <button
+            onClick={() => setActiveTab('appearance')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer ${
+              activeTab === 'appearance'
+                ? 'bg-[#4285F4] text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span>Apparence & Style</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer ${
+              activeTab === 'tasks'
+                ? 'bg-[#4285F4] text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Tâches & Kanban</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('sync')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer ${
+              activeTab === 'sync'
+                ? 'bg-[#4285F4] text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Compte & Cloud</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('updates')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center space-x-1.5 transition-all cursor-pointer ${
+              activeTab === 'updates'
+                ? 'bg-[#4285F4] text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+            <span>Mises à jour & Liens</span>
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+          {/* TAB 1: APPEARANCE & GOOGLE STYLE */}
+          {activeTab === 'appearance' && (
+            <div className="space-y-4">
+              {/* Couleur d'accentuation Google */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <span className="font-semibold text-white text-sm block">Couleur d'accentuation Google</span>
+                <p className="text-[11px] text-slate-400">
+                  Choisissez la teinte principale appliquée aux boutons, sélecteurs et indicateurs :
                 </p>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                  {(Object.keys(THEME_COLOR_MAP) as ThemeColor[]).map((cKey) => {
+                    const cInfo = THEME_COLOR_MAP[cKey];
+                    const isSelected = preferences.themeColor === cKey;
+                    return (
+                      <button
+                        key={cKey}
+                        onClick={() => updatePreference('themeColor', cKey)}
+                        className={`p-2.5 rounded-xl border flex flex-col items-center space-y-1.5 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-white bg-white/10 font-bold shadow-sm'
+                            : 'border-white/10 hover:border-white/20 bg-black/20'
+                        }`}
+                      >
+                        <span className="w-5 h-5 rounded-full shadow-inner flex items-center justify-center" style={{ backgroundColor: cInfo.hex }}>
+                          {isSelected && <Check className="w-3 h-3 text-white stroke-[3]" />}
+                        </span>
+                        <span className="text-[10px] text-slate-300">{cInfo.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Style des coins arrondis */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <span className="font-semibold text-white text-sm block">Arrondi des bordures (Material You)</span>
+                <p className="text-[11px] text-slate-400">
+                  Ajustez la rondeur des cartes, boîtes de dialogue et conteneurs :
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'extra', label: 'Ultra arrondi (24px)', desc: 'Style Google Material You' },
+                    { id: 'standard', label: 'Standard (16px)', desc: 'Style Workspace classique' },
+                    { id: 'minimal', label: 'Léger (8px)', desc: 'Coins subtilement adoucis' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => updatePreference('borderRadius', item.id as BorderRadiusStyle)}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        preferences.borderRadius === item.id
+                          ? 'border-[#4285F4] bg-[#4285F4]/15 font-semibold text-white'
+                          : 'border-white/10 hover:border-white/20 bg-black/20 text-slate-300'
+                      }`}
+                    >
+                      <span className="block text-xs">{item.label}</span>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">{item.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Densité d'affichage */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <span className="font-semibold text-white text-sm block">Densité d'affichage</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => updatePreference('density', 'comfortable')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      preferences.density === 'comfortable'
+                        ? 'border-[#4285F4] bg-[#4285F4]/15 font-semibold text-white'
+                        : 'border-white/10 hover:border-white/20 bg-black/20 text-slate-300'
+                    }`}
+                  >
+                    <span className="block text-xs">Confortable</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Plus d'espace, descriptions et détails visibles</span>
+                  </button>
+                  <button
+                    onClick={() => updatePreference('density', 'compact')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      preferences.density === 'compact'
+                        ? 'border-[#4285F4] bg-[#4285F4]/15 font-semibold text-white'
+                        : 'border-white/10 hover:border-white/20 bg-black/20 text-slate-300'
+                    }`}
+                  >
+                    <span className="block text-xs">Compacte</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Cartes resserrées pour voir un maximum de tâches</span>
+                  </button>
+                </div>
               </div>
             </div>
+          )}
 
-            {/* Status Feedback Box */}
-            <div className="p-3 rounded-lg bg-black/30 border border-white/5 space-y-2">
-              {updaterState.status === 'idle' && (
-                <div className="flex items-center space-x-2 text-slate-400">
-                  <ArrowUpCircle className="w-4 h-4 text-slate-400" />
-                  <span>Version actuelle installée : <strong className="text-white">v{appVersion}</strong></span>
-                </div>
-              )}
-
-              {updaterState.status === 'checking' && (
-                <div className="flex items-center space-x-2 text-blue-400 animate-pulse">
-                  <RotateCw className="w-4 h-4 animate-spin" />
-                  <span>Recherche de mise à jour auprès de GitHub...</span>
-                </div>
-              )}
-
-              {updaterState.status === 'not-available' && (
-                <div className="flex items-center space-x-2 text-emerald-400">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Votre application est à jour ! Vous utilisez la version la plus récente (v{updaterState.version || appVersion}).</span>
-                </div>
-              )}
-
-              {updaterState.status === 'available' && (
-                <div className="flex items-center space-x-2 text-cyan-400">
-                  <ArrowUpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span>Nouvelle version <strong>v{updaterState.version || ''}</strong> trouvée ! Démarrage du téléchargement...</span>
-                </div>
-              )}
-
-              {updaterState.status === 'downloading' && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-blue-400 text-[11px]">
-                    <span className="flex items-center space-x-1.5">
-                      <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Téléchargement de la mise à jour...</span>
+          {/* TAB 2: TASKS & KANBAN BEHAVIOR */}
+          {activeTab === 'tasks' && (
+            <div className="space-y-4">
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <span className="font-semibold text-white text-sm block">Automatisation des Tâches</span>
+                
+                {/* Auto-move to Done */}
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 cursor-pointer">
+                  <div className="pr-4">
+                    <span className="font-medium text-white block">Déplacement automatique vers "Fait"</span>
+                    <span className="text-[11px] text-slate-400">
+                      Quand vous cochez toutes les sous-tâches d'une carte, la déplacer automatiquement dans la colonne "Fait".
                     </span>
-                    <span className="font-mono font-bold">{updaterState.percent || 0}%</span>
                   </div>
-                  <div className="w-full h-2 bg-black/50 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-200"
-                      style={{ width: `${updaterState.percent || 0}%` }}
-                    />
+                  <input
+                    type="checkbox"
+                    checked={preferences.autoMoveDoneTasks}
+                    onChange={(e) => updatePreference('autoMoveDoneTasks', e.target.checked)}
+                    className="w-4 h-4 accent-[#4285F4] rounded cursor-pointer shrink-0"
+                  />
+                </label>
+
+                {/* Show thumbnails */}
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 cursor-pointer">
+                  <div className="pr-4">
+                    <span className="font-medium text-white block">Miniatures d'illustrations sur les cartes</span>
+                    <span className="text-[11px] text-slate-400">
+                      Afficher l'aperçu de la capture d'écran directement dans le tableau Kanban.
+                    </span>
                   </div>
-                </div>
-              )}
+                  <input
+                    type="checkbox"
+                    checked={preferences.showImageThumbnails}
+                    onChange={(e) => updatePreference('showImageThumbnails', e.target.checked)}
+                    className="w-4 h-4 accent-[#4285F4] rounded cursor-pointer shrink-0"
+                  />
+                </label>
 
-              {updaterState.status === 'downloaded' && (
-                <div className="p-2 bg-emerald-500/15 border border-emerald-500/30 rounded-lg space-y-2 text-emerald-300">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span className="font-semibold">Mise à jour v{updaterState.version || ''} prête !</span>
+                {/* Show subtask progress bar */}
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 cursor-pointer">
+                  <div className="pr-4">
+                    <span className="font-medium text-white block">Barre de progression des sous-tâches</span>
+                    <span className="text-[11px] text-slate-400">
+                      Affiche la jauge de progression colorée (0-100%) sur chaque carte.
+                    </span>
                   </div>
-                  <p className="text-[11px] text-slate-300">
-                    Le fichier a été téléchargé avec succès. Vous pouvez l'installer dès maintenant sans perdre vos données.
-                  </p>
+                  <input
+                    type="checkbox"
+                    checked={preferences.showSubtaskProgress}
+                    onChange={(e) => updatePreference('showSubtaskProgress', e.target.checked)}
+                    className="w-4 h-4 accent-[#4285F4] rounded cursor-pointer shrink-0"
+                  />
+                </label>
+              </div>
+
+              {/* Tri par défaut */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-2.5">
+                <span className="font-semibold text-white text-sm block">Tri des colonnes</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'manual', label: 'Glisser-Déposer' },
+                    { id: 'priority', label: 'Par priorité' },
+                    { id: 'date-desc', label: 'Plus récentes' },
+                    { id: 'date-asc', label: 'Plus anciennes' },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => updatePreference('defaultSort', s.id as DefaultSort)}
+                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer text-xs ${
+                        preferences.defaultSort === s.id
+                          ? 'border-[#4285F4] bg-[#4285F4]/15 font-semibold text-white'
+                          : 'border-white/10 hover:border-white/20 bg-black/20 text-slate-300'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
+            </div>
+          )}
 
-              {updaterState.status === 'error' && (
-                <div className="flex items-center space-x-2 text-red-400">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{updaterState.error || 'Impossible de vérifier les mises à jour.'}</span>
+          {/* TAB 3: ACCOUNT & CLOUD */}
+          {activeTab === 'sync' && (
+            <div className="space-y-4">
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    {user?.photoURL ? (
+                      <img src={user.photoURL} alt="Avatar" className="w-10 h-10 rounded-full border-2 border-[#34A853]" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#4285F4] text-white flex items-center justify-center font-bold text-sm">
+                        {user?.email ? user.email[0].toUpperCase() : 'G'}
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-bold text-white text-sm">
+                        {user ? user.displayName || user.email : 'Utilisateur Local'}
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        {user ? user.email : 'Aucun compte Google connecté'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onOpenAuthModal?.();
+                    }}
+                    className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#4285F4] hover:bg-[#3367d6] text-white transition-colors cursor-pointer"
+                  >
+                    {user ? 'Gérer la session' : 'Se connecter'}
+                  </button>
                 </div>
-              )}
+
+                <div className="border-t border-white/10 pt-3 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400">Statut de la base Firestore :</span>
+                  <span className={`font-semibold flex items-center space-x-1 ${user ? 'text-[#34A853]' : 'text-slate-400'}`}>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{user ? 'Connectée & Synchronisée' : 'Mode hors-ligne local'}</span>
+                  </span>
+                </div>
+
+                {lastSyncTime && (
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Dernière synchro réussie :</span>
+                    <span className="text-slate-300 font-mono">{lastSyncTime.toLocaleTimeString()}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Sauvegarde et export global */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <span className="font-semibold text-white text-sm block">Sauvegardes manuelles</span>
+                <p className="text-[11px] text-slate-400">
+                  Exportez une copie de sécurité de vos documents ou enregistrez le document courant sur votre disque.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      saveCurrentDocument();
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium flex items-center space-x-1.5 transition-colors cursor-pointer text-xs"
+                  >
+                    <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Enregistrer localement (Ctrl+S)</span>
+                  </button>
+                  <button
+                    onClick={() => exportBoardToFile(activeBoardId)}
+                    className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium flex items-center space-x-1.5 transition-colors cursor-pointer text-xs"
+                  >
+                    <DownloadCloud className="w-3.5 h-3.5 text-[#8ab4f8]" />
+                    <span>Exporter .taskflow</span>
+                  </button>
+                </div>
+              </div>
             </div>
+          )}
 
-            {/* Action Buttons */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleCheckForUpdates}
-                disabled={isChecking || updaterState.status === 'downloading'}
-                className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold rounded-lg text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-md shadow-blue-600/30 active:scale-[0.99]"
-              >
-                <RotateCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
-                <span>{isChecking ? 'Recherche en cours...' : 'Rechercher une mise à jour'}</span>
-              </button>
+          {/* TAB 4: UPDATES & WEB ACCESS */}
+          {activeTab === 'updates' && (
+            <div className="space-y-4">
+              {/* Updater status box */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-white text-sm flex items-center space-x-2">
+                      <RotateCw className={`w-4 h-4 text-[#8ab4f8] ${isChecking ? 'animate-spin' : ''}`} />
+                      <span>Mises à jour du logiciel</span>
+                    </h4>
+                    <p className="text-slate-400 text-[11px]">
+                      Version installée : <strong className="text-white">v{appVersion}</strong>
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCheckForUpdates}
+                    disabled={isChecking}
+                    className="px-4 py-2 rounded-full text-xs font-semibold bg-[#4285F4] hover:bg-[#3367d6] disabled:opacity-50 text-white transition-all cursor-pointer flex items-center space-x-1.5"
+                  >
+                    {isChecking ? (
+                      <>
+                        <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Vérification...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RotateCw className="w-3.5 h-3.5" />
+                        <span>Rechercher une mise à jour</span>
+                      </>
+                    )}
+                  </button>
+                </div>
 
-              {updaterState.status === 'downloaded' && (
-                <button
-                  onClick={handleInstallNow}
-                  className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 shadow-md shadow-emerald-600/30 transition-all cursor-pointer"
-                >
-                  <DownloadCloud className="w-3.5 h-3.5" />
-                  <span>Redémarrer et Installer</span>
-                </button>
-              )}
-            </div>
-          </div>
+                {/* Status Messages */}
+                {updaterState.status === 'not-available' && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center space-x-2 text-emerald-300 text-xs">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    <span>Vous utilisez déjà la dernière version de TaskFlow (v{appVersion}).</span>
+                  </div>
+                )}
 
-          {/* Section: Synchronisation Cloud & Compte */}
-          <div className="bg-[#1e2334] rounded-xl border border-white/10 p-4 space-y-3">
-            <h4 className="font-bold text-white text-sm flex items-center space-x-2">
-              <Cloud className="w-4 h-4 text-blue-400" />
-              <span>Synchronisation & Données</span>
-            </h4>
-            <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
-              <div>
-                <span className="font-medium text-slate-200 block">
-                  {user ? 'Compte Cloud synchronisé' : 'Stockage local actif'}
-                </span>
-                <span className="text-slate-400 text-[11px]">
-                  {user ? user.email : 'Vos données sont stockées sur votre ordinateur (.taskflow).'}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenAuthModal?.();
-                }}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/15 text-white transition-colors cursor-pointer"
-              >
-                {user ? 'Gérer mon compte' : 'Se connecter'}
-              </button>
-            </div>
-          </div>
+                {updaterState.status === 'downloading' && (
+                  <div className="p-3.5 bg-blue-500/10 border border-blue-500/30 rounded-xl space-y-2">
+                    <div className="flex justify-between text-xs text-blue-300 font-medium">
+                      <span>Téléchargement de la mise à jour...</span>
+                      <span>{updaterState.percent || 0}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#4285F4] rounded-full transition-all duration-200"
+                        style={{ width: `${updaterState.percent || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
 
-          {/* Section: Interface & Raccourcis */}
-          <div className="bg-[#1e2334] rounded-xl border border-white/10 p-4 space-y-2.5">
-            <h4 className="font-bold text-white text-sm flex items-center space-x-2">
-              <Monitor className="w-4 h-4 text-purple-400" />
-              <span>Interface & Système</span>
-            </h4>
-            <div className="space-y-1.5 text-[11px] text-slate-300">
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-slate-400">Design</span>
-                <span className="text-white font-medium">Windows 11 Fluent Dark</span>
+                {updaterState.status === 'downloaded' && (
+                  <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-emerald-300">Mise à jour prête !</p>
+                      <p className="text-[11px] text-slate-300">Redémarrez l'application pour appliquer les changements.</p>
+                    </div>
+                    <button
+                      onClick={handleInstallNow}
+                      className="px-3.5 py-1.5 bg-[#34A853] hover:bg-emerald-600 text-white rounded-full text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Redémarrer et Installer
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-slate-400">Canal de mise à jour</span>
-                <span className="text-white font-medium">GitHub Releases (Auto-Updater)</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-slate-400">Format de documents</span>
-                <span className="text-white font-medium">Fichiers .taskflow</span>
-              </div>
-              <div className="flex items-center justify-between py-1 pt-1.5">
-                <span className="text-slate-400 flex items-center space-x-1.5">
-                  <Globe className="w-3.5 h-3.5 text-emerald-400" />
+
+              {/* Version Web GitHub Pages Banner */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-2.5">
+                <h4 className="font-bold text-white text-sm flex items-center space-x-2">
+                  <Globe className="w-4 h-4 text-[#34A853]" />
                   <span>Version Web (GitHub Pages)</span>
-                </span>
-                <a
-                  href="https://romanf888.github.io/TaskFlow/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-400 hover:text-blue-300 font-medium flex items-center space-x-1 hover:underline"
-                >
-                  <span>romanf888.github.io/TaskFlow</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                </h4>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Toutes les mises à jour de TaskFlow sont automatiquement publiées à la fois sur votre application Windows (.exe) et sur votre site web public :
+                </p>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-black/30 border border-white/10">
+                  <span className="font-mono text-slate-200 text-xs truncate">
+                    https://romanf888.github.io/TaskFlow/
+                  </span>
+                  <a
+                    href="https://romanf888.github.io/TaskFlow/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-1 bg-[#34A853] hover:bg-emerald-600 text-white rounded-full text-xs font-medium flex items-center space-x-1 shrink-0 ml-2"
+                  >
+                    <span>Ouvrir</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 bg-[#1e2334] border-t border-white/10 flex items-center justify-between">
-          <span className="text-[11px] text-slate-500">TaskFlow Windows v{appVersion}</span>
+        <div className="px-6 py-3.5 bg-[#191a1b] border-t border-white/10 flex items-center justify-between">
+          <button
+            onClick={resetPreferences}
+            className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+          >
+            Réinitialiser les préférences
+          </button>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-white/10 hover:bg-white/15 text-slate-200 rounded text-xs font-medium transition-colors cursor-pointer"
+            className="px-5 py-2 bg-white/10 hover:bg-white/15 text-white rounded-full text-xs font-semibold transition-colors cursor-pointer"
           >
             Fermer
           </button>

@@ -204,11 +204,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-2xl bg-[#171b28] border border-white/15 rounded-xl shadow-2xl overflow-hidden text-slate-200 flex flex-col max-h-[90vh] my-auto animate-in zoom-in-95 duration-150"
+        className="relative w-full max-w-2xl bg-[#1e1f20] border border-white/15 rounded-3xl shadow-2xl overflow-hidden text-slate-200 flex flex-col max-h-[90vh] my-auto animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Hidden File Input for Screenshot Upload */}
@@ -220,17 +220,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           className="hidden" 
         />
 
-        {/* Windows Acrylic Header */}
-        <div className="px-5 py-3.5 bg-[#1e2334] border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center space-x-2 truncate pr-4">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+        {/* Google Material Header */}
+        <div className="px-6 py-4 bg-[#191a1b] border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5 truncate pr-4">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#4285F4]"></span>
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              {isEditing ? 'Édition rapide de la tâche' : 'Détails de la tâche'}
+              {isEditing ? 'Édition de la tâche' : 'Détails de la tâche'}
             </span>
           </div>
 
           {/* Action buttons: Pencil Edit Icon & Close button */}
-          <div className="flex items-center space-x-1.5">
+          <div className="flex items-center space-x-2">
             {/* The Famous Top-Right Pencil Icon (Crayon en haut à droite) */}
             <button
               onClick={() => {
