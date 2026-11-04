@@ -1,0 +1,6 @@
+{
+  "name": "TaskFlow Windows - Gestionnaire de Tâches Kanban",
+  "description": "Gestionnaire de tâches style Windows avec tableau Kanban (À faire, En cours, Fait), synchronisation cloud Google, multi-documents de projets, sous-tâches et captures d'écran.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
