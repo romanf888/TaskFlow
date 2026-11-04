@@ -46,7 +46,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
   const [activeTab, setActiveTab] = useState<'appearance' | 'tasks' | 'sync' | 'storage' | 'updates'>('appearance');
-  const [appVersion, setAppVersion] = useState('1.0.8');
+  const [appVersion, setAppVersion] = useState('1.0.9');
   const [updaterState, setUpdaterState] = useState<UpdaterStatusState>({ status: 'idle' });
   const [isChecking, setIsChecking] = useState(false);
 
