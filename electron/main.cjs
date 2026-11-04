@@ -187,12 +187,14 @@ function setupAutoUpdater() {
 }
 
 async function createWindow() {
+  const appIconPath = path.join(__dirname, '../build/icon.png');
   mainWindow = new BrowserWindow({
     width: 1240,
     height: 820,
     minWidth: 900,
     minHeight: 600,
     title: 'TaskFlow Workspace',
+    icon: fs.existsSync(appIconPath) ? appIconPath : undefined,
     backgroundColor: '#131314',
     frame: false,
     titleBarStyle: 'hidden',
