@@ -94,6 +94,21 @@ export async function loginWithGoogle(): Promise<User> {
   return result.user;
 }
 
+export async function loginWithEmail(email: string, pass: string): Promise<User> {
+  const { signInWithEmailAndPassword } = await import('firebase/auth');
+  const result = await signInWithEmailAndPassword(auth, email, pass);
+  return result.user;
+}
+
+export async function registerWithEmail(email: string, pass: string, displayName?: string): Promise<User> {
+  const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+  const result = await createUserWithEmailAndPassword(auth, email, pass);
+  if (displayName && result.user) {
+    await updateProfile(result.user, { displayName });
+  }
+  return result.user;
+}
+
 export async function logoutUser(): Promise<void> {
   await signOut(auth);
 }

@@ -13,6 +13,8 @@ import {
   db, 
   onAuthStateChanged, 
   loginWithGoogle, 
+  loginWithEmail,
+  registerWithEmail,
   logoutUser, 
   User, 
   handleFirestoreError, 
@@ -63,6 +65,8 @@ interface TaskContextType {
 
   // Auth actions
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, pass: string) => Promise<void>;
+  registerWithEmail: (email: string, pass: string, name?: string) => Promise<void>;
   signOut: () => Promise<void>;
   notificationMessage: string | null;
   setNotificationMessage: (msg: string | null) => void;
@@ -613,6 +617,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setSyncStatus('syncing');
       await loginWithGoogle();
+      showNotification('Connecté avec succès !');
     } catch (err) {
       console.error('Google Sign-in failed', err);
       showNotification('Connexion Google annulée ou échouée.');
@@ -620,10 +625,46 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const handleEmailLogin = async (email: string, pass: string) => {
+    try {
+      setSyncStatus('syncing');
+      await loginWithEmail(email, pass);
+      showNotification('Connecté avec succès !');
+    } catch (err: any) {
+      console.error('Email sign-in failed', err);
+      const msg = err?.message?.includes('user-not-found') 
+        ? 'Compte introuvable. Veuillez créer un compte.' 
+        : err?.message?.includes('wrong-password') || err?.message?.includes('invalid-credential')
+        ? 'Mot de passe incorrect.'
+        : 'Échec de connexion : ' + (err?.message || 'Erreur inconnue');
+      showNotification(msg);
+      setSyncStatus('local');
+      throw err;
+    }
+  };
+
+  const handleEmailRegister = async (email: string, pass: string, name?: string) => {
+    try {
+      setSyncStatus('syncing');
+      await registerWithEmail(email, pass, name);
+      showNotification('Compte créé avec succès !');
+    } catch (err: any) {
+      console.error('Registration failed', err);
+      const msg = err?.message?.includes('email-already-in-use')
+        ? 'Cet email possède déjà un compte. Essayez de vous connecter.'
+        : err?.message?.includes('weak-password')
+        ? 'Mot de passe trop court (min. 6 caractères).'
+        : 'Échec création de compte : ' + (err?.message || 'Erreur');
+      showNotification(msg);
+      setSyncStatus('local');
+      throw err;
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logoutUser();
-      showNotification('Déconnecté du compte Google.');
+      showNotification('Déconnecté du compte.');
     } catch (err) {
       console.error('Logout error', err);
     }
@@ -664,6 +705,8 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         duplicateTask,
         toggleSubtask,
         signInWithGoogle: handleGoogleLogin,
+        signInWithEmail: handleEmailLogin,
+        registerWithEmail: handleEmailRegister,
         signOut: handleLogout,
         notificationMessage,
         setNotificationMessage,
