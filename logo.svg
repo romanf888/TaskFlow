@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <!-- Google 4-Color TaskFlow Ribbon & Checkmark Icon -->
+  <g filter="url(#shadow)">
+    <!-- Blue top-left bar -->
+    <path d="M10 14 C10 9.58 13.58 6 18 6 L30 6 C34.42 6 38 9.58 38 14 L38 18 C38 18 34 18 30 18 L18 18 C13.58 18 10 14 10 14 Z" fill="#4285F4"/>
+    
+    <!-- Red top-right stem -->
+    <path d="M30 6 L38 14 L38 26 C38 30.42 34.42 34 30 34 L26 34 L26 18 L30 18 Z" fill="#EA4335"/>
+    
+    <!-- Yellow bottom-left check hook -->
+    <path d="M10 24 C10 19.58 13.58 16 18 16 L22 16 L22 32 C22 36.42 18.42 40 14 40 C11.79 40 10 38.21 10 36 Z" fill="#FBBC05"/>
+    
+    <!-- Green dynamic checkmark swoosh -->
+    <path d="M16 28 L23 35 C24.1 36.1 25.9 36.1 27 35 L41 19 C42.1 17.9 42.1 16.1 41 15 C39.9 13.9 38.1 13.9 37 15 L25 27 L19.5 22.5 C18.4 21.4 16.6 21.6 15.6 22.7 C14.6 23.8 14.8 25.6 16 26.5 Z" fill="#34A853"/>
+  </g>
+</svg>
