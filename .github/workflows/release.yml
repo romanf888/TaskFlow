@@ -26,10 +26,12 @@ jobs:
 
       - name: Sync package.json version with git tag
         shell: bash
+        env:
+          RAW_TAG: ${{ github.ref_name }}
         run: |
-          TAG_VERSION=${GITHUB_REF_NAME#v}
-          echo "Syncing package.json version to $TAG_VERSION"
-          npm version $TAG_VERSION --no-git-tag-version --allow-same-version
+          CLEAN_VERSION="${RAW_TAG#v}"
+          echo "Syncing package.json version to $CLEAN_VERSION"
+          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8')); pkg.version = process.env.CLEAN_VERSION || '$CLEAN_VERSION'; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
 
       - name: Build Web App and Package Windows Installer (.exe)
         run: npm run electron:build
