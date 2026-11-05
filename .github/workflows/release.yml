@@ -30,8 +30,8 @@ jobs:
           RAW_TAG: ${{ github.ref_name }}
         run: |
           CLEAN_VERSION="${RAW_TAG#v}"
-          echo "Syncing package.json version to $CLEAN_VERSION"
-          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8')); pkg.version = process.env.CLEAN_VERSION || '$CLEAN_VERSION'; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
+          echo "Processing version from tag: $CLEAN_VERSION"
+          node -e "const fs = require('fs'); let raw = process.env.CLEAN_VERSION || '1.2.1'; let parts = raw.split('.'); if (parts.length > 3) { raw = parts[0] + '.' + parts[1] + '.' + (parseInt(parts[2] || '0', 10) + parseInt(parts[3] || '0', 10)); } console.log('SemVer version:', raw); const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8')); pkg.version = raw; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
 
       - name: Build Web App and Package Windows Installer (.exe)
         run: npm run electron:build
