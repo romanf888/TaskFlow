@@ -258,7 +258,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         {onOpenLandingPage && (
           <button
             onClick={onOpenLandingPage}
-            className={`hidden sm:flex items-center space-x-1 px-2.5 py-1.5 rounded-full border transition-colors cursor-pointer text-xs font-semibold ${
+            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-full border transition-colors cursor-pointer text-xs font-semibold ${
               isLight 
                 ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800' 
                 : 'bg-white/10 hover:bg-white/20 border-white/15 text-white'
@@ -266,7 +266,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             title="Ouvrir le site de présentation & Wiki"
           >
             <Globe className="w-3.5 h-3.5 text-[#4285F4]" />
-            <span>Site & Wiki</span>
+            <span className="hidden xs:inline">Site & Wiki</span>
           </button>
         )}
 

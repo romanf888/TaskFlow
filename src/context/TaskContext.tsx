@@ -523,7 +523,35 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, [showNotification]);
 
-  // Firestore Sync when User is authenticated
+  // Real-time listener for joined Team Sessions
+  useEffect(() => {
+    if (teamSessions.length === 0) return;
+
+    const unsubs: (() => void)[] = [];
+    teamSessions.forEach((session) => {
+      if (!session.code) return;
+      try {
+        const sessionRef = doc(db, 'team_sessions', session.code);
+        const unsub = onSnapshot(sessionRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const updatedData = { id: docSnap.id, ...docSnap.data() } as TeamSession;
+            setTeamSessions((prev) =>
+              prev.map((s) => (s.code === updatedData.code ? updatedData : s))
+            );
+          }
+        });
+        unsubs.push(unsub);
+      } catch (e) {
+        console.warn('Error subscribing to team session:', e);
+      }
+    });
+
+    return () => {
+      unsubs.forEach((u) => u());
+    };
+  }, [teamSessions.map((s) => s.code).join(',')]);
+
+  // Firestore Sync when User is authenticated (Personal + Shared Team Boards)
   useEffect(() => {
     if (!user) {
       setSyncStatus('local');
@@ -533,19 +561,38 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSyncStatus('syncing');
     const boardsPath = 'boards';
 
-    // Query boards owned by user
-    const boardsQuery = query(
+    // Query personal boards
+    const personalBoardsQuery = query(
       collection(db, boardsPath),
       where('ownerId', '==', user.uid)
     );
 
+    const activeTeamCodes = teamSessions.map((s) => s.code).filter(Boolean);
+
     const unsubscribeBoards = onSnapshot(
-      boardsQuery,
-      async (snapshot) => {
+      personalBoardsQuery,
+      async (personalSnapshot) => {
         const cloudBoards: BoardDocument[] = [];
-        snapshot.forEach((docSnap) => {
+        personalSnapshot.forEach((docSnap) => {
           cloudBoards.push({ id: docSnap.id, ...docSnap.data() } as BoardDocument);
         });
+
+        // Also fetch team boards if user belongs to team sessions
+        if (activeTeamCodes.length > 0) {
+          try {
+            for (const teamCode of activeTeamCodes) {
+              const teamBoardsQuery = query(collection(db, boardsPath), where('teamSessionCode', '==', teamCode));
+              const teamSnap = await import('firebase/firestore').then(m => m.getDocs(teamBoardsQuery));
+              teamSnap.forEach((docSnap) => {
+                if (!cloudBoards.some(b => b.id === docSnap.id)) {
+                  cloudBoards.push({ id: docSnap.id, ...docSnap.data() } as BoardDocument);
+                }
+              });
+            }
+          } catch (e) {
+            console.warn('Error fetching team boards:', e);
+          }
+        }
 
         if (cloudBoards.length === 0) {
           // First time cloud user: Migrate initial local boards to user's cloud account!
@@ -590,18 +637,21 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       unsubscribeBoards();
     };
-  }, [user, activeBoardId]);
+  }, [user, activeBoardId, teamSessions.map((s) => s.code).join(',')]);
 
-  // Sync tasks for current active board from Firestore
+  // Sync tasks for current active board from Firestore (Shared for Team Board, Personal for private)
   useEffect(() => {
     if (!user || !activeBoardId) return;
 
     setSyncStatus('syncing');
     const tasksPath = `boards/${activeBoardId}/tasks`;
-    const tasksQuery = query(
-      collection(db, tasksPath),
-      where('ownerId', '==', user.uid)
-    );
+    const activeBoardObj = boards.find(b => b.id === activeBoardId);
+    const isTeamBoard = !!activeBoardObj?.teamSessionCode;
+
+    // For team boards, query all tasks without filtering ownerId so all team members see them
+    const tasksQuery = isTeamBoard
+      ? query(collection(db, tasksPath))
+      : query(collection(db, tasksPath), where('ownerId', '==', user.uid));
 
     const unsubscribeTasks = onSnapshot(
       tasksQuery,
@@ -629,7 +679,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       unsubscribeTasks();
     };
-  }, [user, activeBoardId]);
+  }, [user, activeBoardId, boards]);
 
   // Derived state
   const activeBoard = useMemo(() => {

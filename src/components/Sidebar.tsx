@@ -31,7 +31,8 @@ import {
   Key,
   LogOut,
   Share2,
-  BookOpen
+  BookOpen,
+  Globe
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 import { useSettings } from '../context/SettingsContext';
@@ -117,6 +118,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [dragOverTargetProjectName, setDragOverTargetProjectName] = useState<string | null>(null);
   const [dragOverProjectPosition, setDragOverProjectPosition] = useState<'before' | 'after' | null>(null);
 
+  // Direct Pointer/Mouse Drag & Drop State for Documents
+  const [pointerDragBoardId, setPointerDragBoardId] = useState<string | null>(null);
+  const [pointerDragPos, setPointerDragPos] = useState<{ x: number; y: number } | null>(null);
+  const [pointerDragTargetId, setPointerDragTargetId] = useState<string | null>(null);
+  const [pointerDragInsertPos, setPointerDragInsertPos] = useState<'before' | 'after' | null>(null);
+  const [pointerDragTargetProject, setPointerDragTargetProject] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleProjectCollapse = (projectName: string) => {
@@ -141,6 +149,115 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setNewProjectName('');
       setIsCreatingProject(false);
     }
+  };
+
+  // --- Pointer/Mouse Hold & Drag Handler for Documents ---
+  const handleDocumentPointerDown = (e: React.PointerEvent, boardId: string) => {
+    if ((e.target as HTMLElement).closest('button, input')) return;
+    if (e.button !== 0) return;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let isDragging = false;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const dist = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+      if (!isDragging && dist > 4) {
+        isDragging = true;
+        setPointerDragBoardId(boardId);
+        draggedBoardRef.current = boardId;
+      }
+
+      if (isDragging) {
+        setPointerDragPos({ x: moveEvent.clientX, y: moveEvent.clientY });
+
+        const elem = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+        if (elem) {
+          const boardElem = elem.closest('[data-board-id]') as HTMLElement;
+          const projectElem = elem.closest('[data-project-name]') as HTMLElement;
+
+          if (boardElem) {
+            const targetId = boardElem.getAttribute('data-board-id');
+            if (targetId && targetId !== boardId) {
+              const rect = boardElem.getBoundingClientRect();
+              const isAfter = (moveEvent.clientY - rect.top) > (rect.height / 2);
+              setPointerDragTargetId(targetId);
+              setPointerDragInsertPos(isAfter ? 'after' : 'before');
+              setPointerDragTargetProject(null);
+              return;
+            }
+          }
+
+          if (projectElem) {
+            const projName = projectElem.getAttribute('data-project-name');
+            if (projName) {
+              setPointerDragTargetProject(projName);
+              setPointerDragTargetId(null);
+              setPointerDragInsertPos(null);
+              return;
+            }
+          }
+        }
+
+        setPointerDragTargetId(null);
+        setPointerDragInsertPos(null);
+        setPointerDragTargetProject(null);
+      }
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+
+      if (isDragging) {
+        const elem = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+        if (elem) {
+          const boardElem = elem.closest('[data-board-id]') as HTMLElement;
+          const projectElem = elem.closest('[data-project-name]') as HTMLElement;
+
+          if (boardElem) {
+            const targetId = boardElem.getAttribute('data-board-id');
+            if (targetId && targetId !== boardId) {
+              const currentList = [...boards].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+              const sourceBoard = currentList.find(b => b.id === boardId);
+              const targetBoard = currentList.find(b => b.id === targetId);
+
+              if (sourceBoard && targetBoard) {
+                const remaining = currentList.filter(b => b.id !== boardId);
+                const targetIndex = remaining.findIndex(b => b.id === targetId);
+                if (targetIndex !== -1) {
+                  const rect = boardElem.getBoundingClientRect();
+                  const isAfter = (upEvent.clientY - rect.top) > (rect.height / 2);
+                  const insertIndex = isAfter ? targetIndex + 1 : targetIndex;
+
+                  const updatedSource = {
+                    ...sourceBoard,
+                    projectName: targetBoard.projectName
+                  };
+
+                  remaining.splice(insertIndex, 0, updatedSource);
+                  reorderBoards(remaining);
+                }
+              }
+            }
+          } else if (projectElem) {
+            const projName = projectElem.getAttribute('data-project-name');
+            const targetProj = (projName === '__none__' || !projName) ? undefined : projName;
+            assignBoardToProject(boardId, targetProj);
+          }
+        }
+      }
+
+      setPointerDragBoardId(null);
+      setPointerDragPos(null);
+      setPointerDragTargetId(null);
+      setPointerDragInsertPos(null);
+      setPointerDragTargetProject(null);
+      draggedBoardRef.current = null;
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
   };
 
   // --- Document (Board) Drag and Drop Handlers ---
@@ -298,10 +415,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const doneTasks = boardTasks.filter((t: Task) => t.status === 'done').length;
     const accentColor = board.color || '#4285F4';
 
+    const isPointerDragOver = pointerDragTargetId === board.id;
+    const isPointerDragged = pointerDragBoardId === board.id;
+
     return (
       <div
         key={board.id}
+        data-board-id={board.id}
         draggable
+        onPointerDown={(e) => handleDocumentPointerDown(e, board.id)}
         onDragStart={(e) => handleBoardDragStart(e, board.id)}
         onDragEnd={handleBoardDragEnd}
         onDragOver={(e) => {
@@ -328,9 +450,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           setActiveBoardId(board.id);
           setOpenAssignMenuDocId(null);
         }}
-        title="Glissez à la souris pour réordonner ou classer dans un projet"
+        title="Maintenez le clic pour faire glisser et réordonner le document"
         className={`group relative flex items-center justify-between px-2.5 py-2 rounded-xl transition-all duration-150 cursor-grab active:cursor-grabbing select-none ${
-          isDragged ? 'opacity-35 scale-[0.98]' : ''
+          isDragged || isPointerDragged ? 'opacity-35 scale-[0.98]' : ''
         } ${
           isActive
             ? isLight
@@ -342,12 +464,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       >
         {/* Drop Insertion Line Indicator */}
-        {isDragOver && dragOverPosition === 'before' && (
+        {((isDragOver && dragOverPosition === 'before') || (isPointerDragOver && pointerDragInsertPos === 'before')) && (
           <div className="absolute -top-1 left-1.5 right-1.5 h-[2.5px] bg-[#4285F4] rounded-full z-30 pointer-events-none flex items-center shadow-md shadow-[#4285F4]/50">
             <div className="w-2.5 h-2.5 rounded-full bg-[#4285F4] -ml-1 ring-2 ring-white dark:ring-slate-900" />
           </div>
         )}
-        {isDragOver && dragOverPosition === 'after' && (
+        {((isDragOver && dragOverPosition === 'after') || (isPointerDragOver && pointerDragInsertPos === 'after')) && (
           <div className="absolute -bottom-1 left-1.5 right-1.5 h-[2.5px] bg-[#4285F4] rounded-full z-30 pointer-events-none flex items-center shadow-md shadow-[#4285F4]/50">
             <div className="w-2.5 h-2.5 rounded-full bg-[#4285F4] -ml-1 ring-2 ring-white dark:ring-slate-900" />
           </div>
@@ -417,36 +539,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Hover Controls: Up/Down reorder + Move to project + Rename/Delete */}
-        <div className="hidden group-hover:flex items-center space-x-0.5 shrink-0 ml-1">
-          {/* Reorder Up/Down in Custom Sort */}
-          {boardSortPreference === 'custom' && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moveBoardOrder(board.id, 'up');
-                }}
-                className={`p-1 rounded hover:bg-black/10 transition-colors ${
-                  isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
-                }`}
-                title="Monter le document (ou glisser à la souris)"
-              >
-                <ArrowUp className="w-3 h-3" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moveBoardOrder(board.id, 'down');
-                }}
-                className={`p-1 rounded hover:bg-black/10 transition-colors ${
-                  isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
-                }`}
-                title="Descendre le document (ou glisser à la souris)"
-              >
-                <ArrowDown className="w-3 h-3" />
-              </button>
-            </>
-          )}
+        <div 
+          className="hidden group-hover:flex items-center space-x-0.5 shrink-0 ml-1"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Reorder Up/Down */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              moveBoardOrder(board.id, 'up');
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            className={`p-1 rounded hover:bg-black/10 transition-colors ${
+              isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+            }`}
+            title="Monter le document (ou glisser à la souris)"
+          >
+            <ArrowUp className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              moveBoardOrder(board.id, 'down');
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            className={`p-1 rounded hover:bg-black/10 transition-colors ${
+              isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+            }`}
+            title="Descendre le document (ou glisser à la souris)"
+          >
+            <ArrowDown className="w-3 h-3" />
+          </button>
 
           {/* Assign to Project Menu */}
           <div className="relative">
@@ -570,7 +693,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <TaskFlowLogo size={30} showText={true} />
         </div>
 
-        {/* Action: + Nouveau Document */}
+        {/* Actions: + Nouveau Document & Site/Wiki */}
         <div className="p-3 space-y-2">
           <button
             onClick={onOpenNewDocModal}
@@ -583,6 +706,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Plus className="w-4 h-4 text-[#4285F4] group-hover:scale-110 transition-transform" />
             <span>Nouveau document</span>
           </button>
+
+          {onOpenLandingPage && (
+            <button
+              onClick={onOpenLandingPage}
+              className={`w-full py-2 px-4 rounded-full border flex items-center justify-center space-x-2 text-xs font-semibold transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+                  : 'bg-white/10 hover:bg-white/20 border-white/15 text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-[#4285F4]" />
+              <span>Site de Présentation & Wiki</span>
+            </button>
+          )}
         </div>
 
         {/* Section: Documents / Projets Bar */}
@@ -735,6 +872,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return (
               <div 
                 key={project} 
+                data-project-name={project}
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -751,7 +889,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 onDrop={(e) => handleBoardDropOnProject(e, project)}
                 className={`rounded-xl transition-all p-1 ${
-                  isProjectDragOver 
+                  isProjectDragOver || pointerDragTargetProject === project
                     ? isLight
                       ? 'border-2 border-dashed border-[#1967d2] bg-blue-100/60 ring-2 ring-blue-300'
                       : 'border-2 border-dashed border-[#4285F4] bg-[#4285F4]/20 ring-2 ring-[#4285F4]/40'
@@ -1117,6 +1255,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       </aside>
+
+      {/* Floating Mouse/Pointer Drag Badge Preview */}
+      {pointerDragBoardId && pointerDragPos && (
+        <div
+          style={{
+            position: 'fixed',
+            left: pointerDragPos.x + 14,
+            top: pointerDragPos.y + 14,
+            pointerEvents: 'none',
+            zIndex: 9999,
+          }}
+          className="px-3.5 py-2 bg-[#4285F4] text-white rounded-2xl shadow-2xl border border-white/30 text-xs font-bold flex items-center space-x-2 animate-in fade-in"
+        >
+          <GripVertical className="w-4 h-4 text-white/80" />
+          <span>Déplacement : {boards.find(b => b.id === pointerDragBoardId)?.title || 'Document'}</span>
+        </div>
+      )}
     </>
   );
 };
