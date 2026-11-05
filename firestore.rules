@@ -25,23 +25,23 @@ service cloud.firestore {
 
     function isValidBoard(data) {
       return data.keys().hasAll(['title', 'ownerId']) &&
-        data.keys().hasOnly(['title', 'ownerId', 'description', 'icon', 'color', 'createdAt', 'updatedAt', 'id', 'isCloud']) &&
         data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
-        data.ownerId is string && data.ownerId == request.auth.uid &&
+        data.ownerId is string &&
         (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
         (!('isCloud' in data) || data.isCloud is bool) &&
         (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
         (!('icon' in data) || (data.icon is string && data.icon.size() <= 50)) &&
-        (!('color' in data) || (data.color is string && data.color.size() <= 20));
+        (!('color' in data) || (data.color is string && data.color.size() <= 20)) &&
+        (!('projectName' in data) || (data.projectName is string && data.projectName.size() <= 100)) &&
+        (!('teamSessionCode' in data) || (data.teamSessionCode is string && data.teamSessionCode.size() <= 50));
     }
 
     function isValidTask(data) {
       return data.keys().hasAll(['title', 'status', 'boardId', 'ownerId']) &&
-        data.keys().hasOnly(['title', 'status', 'boardId', 'ownerId', 'description', 'priority', 'category', 'tags', 'subtasks', 'screenshotUrl', 'order', 'createdAt', 'updatedAt', 'id']) &&
         data.title is string && data.title.size() >= 1 && data.title.size() <= 150 &&
         data.status in ['todo', 'in_progress', 'done'] &&
         data.boardId is string && data.boardId.size() <= 128 &&
-        data.ownerId is string && data.ownerId == request.auth.uid &&
+        data.ownerId is string &&
         (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
         (!('description' in data) || (data.description is string && data.description.size() <= 3000)) &&
         (!('priority' in data) || data.priority in ['low', 'medium', 'high', 'urgent']) &&
@@ -54,24 +54,19 @@ service cloud.firestore {
 
     // Boards collection
     match /boards/{boardId} {
-      allow get: if isSignedIn() && isValidId(boardId) && resource.data.ownerId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(boardId) && isValidBoard(incoming()) && incoming().ownerId == request.auth.uid;
-      allow update: if isSignedIn() && isValidId(boardId) && isValidBoard(incoming()) && existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId;
-      allow delete: if isSignedIn() && isValidId(boardId) && existing().ownerId == request.auth.uid;
+      allow get, list, create, update, delete: if isSignedIn();
 
       // Tasks subcollection under a board
       match /tasks/{taskId} {
-        allow get: if isSignedIn() && isValidId(taskId) && resource.data.ownerId == request.auth.uid;
-        allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-        allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) &&
-          incoming().ownerId == request.auth.uid &&
-          incoming().boardId == boardId;
-        allow update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) &&
-          existing().ownerId == request.auth.uid &&
-          incoming().ownerId == existing().ownerId &&
-          incoming().boardId == existing().boardId;
-        allow delete: if isSignedIn() && isValidId(taskId) && existing().ownerId == request.auth.uid;
+        allow get, list, create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Team Sessions collection
+    match /team_sessions/{code} {
+      allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
       }
     }
   }

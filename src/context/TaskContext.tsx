@@ -22,7 +22,18 @@ import {
   OperationType,
   testConnection 
 } from '../firebase';
-import { BoardDocument, Task, TaskStatus, TaskPriority, DEFAULT_CATEGORIES, TagCategoryDefinition, Subtask } from '../types/task';
+import { 
+  BoardDocument, 
+  Task, 
+  TaskStatus, 
+  TaskPriority, 
+  DEFAULT_CATEGORIES, 
+  TagCategoryDefinition, 
+  Subtask,
+  TeamMember,
+  TeamSession,
+  BoardSortPreference 
+} from '../types/task';
 import { INITIAL_BOARDS, INITIAL_TASKS } from '../data/initialData';
 
 interface TaskContextType {
@@ -31,8 +42,26 @@ interface TaskContextType {
   syncStatus: 'synced' | 'syncing' | 'offline' | 'local';
   lastSyncTime: Date | null;
   boards: BoardDocument[];
+  sortedBoards: BoardDocument[];
   activeBoard: BoardDocument | null;
   activeBoardId: string;
+  projects: string[];
+  teamSessions: TeamSession[];
+  boardSortPreference: BoardSortPreference;
+  setBoardSortPreference: (pref: BoardSortPreference) => void;
+  reorderBoards: (newBoards: BoardDocument[]) => void;
+  moveBoardOrder: (boardId: string, direction: 'up' | 'down') => void;
+  createProject: (projectName: string) => void;
+  deleteProject: (projectName: string) => void;
+  renameProject: (oldName: string, newName: string) => void;
+  assignBoardToProject: (boardId: string, projectName?: string) => void;
+  reorderProjects: (newProjects: string[]) => void;
+  
+  // Team Session actions
+  createTeamSession: (name: string) => Promise<string>;
+  joinTeamSession: (code: string) => Promise<boolean>;
+  leaveTeamSession: (code: string) => Promise<void>;
+
   tasks: Task[]; // Tasks for the active board
   allTasks: Task[]; // All tasks across all boards
   categories: TagCategoryDefinition[];
@@ -49,7 +78,7 @@ interface TaskContextType {
 
   // Document / Board actions
   setActiveBoardId: (id: string) => void;
-  createBoard: (title: string, description?: string, icon?: string, color?: string) => Promise<string>;
+  createBoard: (title: string, description?: string, icon?: string, color?: string, projectName?: string, teamSessionCode?: string) => Promise<string>;
   updateBoard: (boardId: string, updates: Partial<BoardDocument>) => Promise<void>;
   deleteBoard: (boardId: string) => Promise<void>;
   exportBoardToFile: (boardId: string) => void;
@@ -109,6 +138,9 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
 
   // Boards and tasks state
+  const LOCAL_STORAGE_PROJECTS_KEY = 'taskflow_windows_projects_v2';
+  const LOCAL_STORAGE_BOARD_SORT_KEY = 'taskflow_windows_board_sort_v2';
+
   const [boards, setBoards] = useState<BoardDocument[]>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_BOARDS_KEY);
     if (saved) {
@@ -121,6 +153,309 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return INITIAL_BOARDS;
   });
+
+  const [projects, setProjects] = useState<string[]>(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_PROJECTS_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    // Extract unique projects from initial boards if present
+    const extracted = Array.from(new Set(INITIAL_BOARDS.map((b) => b.projectName).filter(Boolean))) as string[];
+    return extracted.length > 0 ? extracted : ['Projet Professionnel', 'Personnel'];
+  });
+
+  const LOCAL_STORAGE_TEAMS_KEY = 'taskflow_team_sessions_v1';
+
+  const [teamSessions, setTeamSessions] = useState<TeamSession[]>(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_TEAMS_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [
+      {
+        id: 'team_demo_1',
+        code: 'TF-7892',
+        name: 'Équipe UEFN & Devs',
+        creatorId: 'user_admin',
+        creatorName: 'Romain',
+        members: [
+          { id: 'mem_1', name: 'Romain', joinedAt: new Date().toISOString(), avatarColor: '#4285F4' },
+          { id: 'mem_2', name: 'Alex', joinedAt: new Date().toISOString(), avatarColor: '#34A853' },
+          { id: 'mem_3', name: 'Sophie', joinedAt: new Date().toISOString(), avatarColor: '#FBBC04' },
+        ],
+        createdAt: new Date().toISOString(),
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_TEAMS_KEY, JSON.stringify(teamSessions));
+  }, [teamSessions]);
+
+  const [boardSortPreference, setBoardSortPreferenceState] = useState<BoardSortPreference>(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_BOARD_SORT_KEY);
+    if (saved && ['custom', 'title-asc', 'title-desc', 'date-desc', 'date-asc'].includes(saved)) {
+      return saved as BoardSortPreference;
+    }
+    return 'custom';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_PROJECTS_KEY, JSON.stringify(projects));
+  }, [projects]);
+
+  const setBoardSortPreference = (pref: BoardSortPreference) => {
+    setBoardSortPreferenceState(pref);
+    localStorage.setItem(LOCAL_STORAGE_BOARD_SORT_KEY, pref);
+  };
+
+  const sortedBoards = useMemo(() => {
+    const list = [...boards];
+    switch (boardSortPreference) {
+      case 'title-asc':
+        return list.sort((a, b) => a.title.localeCompare(b.title));
+      case 'title-desc':
+        return list.sort((a, b) => b.title.localeCompare(a.title));
+      case 'date-desc':
+        return list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      case 'date-asc':
+        return list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+      case 'custom':
+      default:
+        return list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    }
+  }, [boards, boardSortPreference]);
+
+  const reorderBoards = (newBoards: BoardDocument[]) => {
+    const updated = newBoards.map((b, idx) => ({ ...b, order: idx }));
+    setBoards(updated);
+    if (boardSortPreference !== 'custom') {
+      setBoardSortPreference('custom');
+    }
+
+    if (user) {
+      updated.forEach(async (b) => {
+        try {
+          await setDoc(doc(db, 'boards', b.id), cleanFirestoreData({ 
+            order: b.order, 
+            projectName: b.projectName ?? null 
+          }), { merge: true });
+        } catch (e) {
+          console.warn('Failed to update board order in Firestore', e);
+        }
+      });
+    }
+  };
+
+  const moveBoardOrder = (boardId: string, direction: 'up' | 'down') => {
+    const currentList = [...boards].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const idx = currentList.findIndex((b) => b.id === boardId);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= currentList.length) return;
+
+    const temp = currentList[idx];
+    currentList[idx] = currentList[targetIdx];
+    currentList[targetIdx] = temp;
+
+    const updated = currentList.map((b, i) => ({ ...b, order: i }));
+    setBoards(updated);
+    if (boardSortPreference !== 'custom') {
+      setBoardSortPreference('custom');
+    }
+
+    if (user) {
+      updated.forEach(async (b) => {
+        try {
+          await setDoc(doc(db, 'boards', b.id), cleanFirestoreData({ order: b.order }), { merge: true });
+        } catch (e) {
+          console.warn('Failed to update board order in Firestore', e);
+        }
+      });
+    }
+
+    showNotification(`Position du document mise à jour.`);
+  };
+
+  const createProject = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (!projects.includes(trimmed)) {
+      setProjects((prev) => [...prev, trimmed]);
+      showNotification(`Nouveau projet créé : "${trimmed}"`);
+    }
+  };
+
+  const deleteProject = (name: string) => {
+    setProjects((prev) => prev.filter((p) => p !== name));
+    setBoards((prev) => prev.map((b) => b.projectName === name ? { ...b, projectName: undefined } : b));
+    showNotification(`Projet "${name}" supprimé.`);
+  };
+
+  const renameProject = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    setProjects((prev) => prev.map((p) => p === oldName ? trimmed : p));
+    setBoards((prev) => prev.map((b) => b.projectName === oldName ? { ...b, projectName: trimmed } : b));
+    showNotification(`Projet renommé en "${trimmed}".`);
+  };
+
+  const assignBoardToProject = (boardId: string, projectName?: string) => {
+    const trimmed = projectName?.trim() || undefined;
+    if (trimmed && !projects.includes(trimmed)) {
+      setProjects((prev) => [...prev, trimmed]);
+    }
+    updateBoard(boardId, { projectName: trimmed });
+    showNotification(trimmed ? `Document rattaché à "${trimmed}"` : `Document retiré du projet.`);
+  };
+
+  const reorderProjects = (newProjects: string[]) => {
+    setProjects(newProjects);
+    showNotification('Ordre des projets mis à jour.');
+  };
+
+  // Team Session Actions with Firestore Google Account Sync
+  const createTeamSession = async (name: string): Promise<string> => {
+    // Force Google Sign-In if not signed in
+    let currentAuthUser = user;
+    if (!currentAuthUser) {
+      try {
+        currentAuthUser = await loginWithGoogle();
+        setUser(currentAuthUser);
+      } catch (err) {
+        showNotification('Connexion Google requise pour créer une session d’équipe.');
+        throw err;
+      }
+    }
+
+    const codeDigits = Math.floor(1000 + Math.random() * 9000).toString();
+    const code = `TF-${codeDigits}`;
+    const creatorName = currentAuthUser.displayName || currentAuthUser.email?.split('@')[0] || 'Membre Google';
+    const creatorId = currentAuthUser.uid;
+
+    const newSession: TeamSession = {
+      id: `team_${code}`,
+      code,
+      name: name.trim(),
+      creatorId,
+      creatorName,
+      members: [
+        {
+          id: creatorId,
+          name: creatorName,
+          email: currentAuthUser.email || undefined,
+          joinedAt: new Date().toISOString(),
+          avatarColor: '#4285F4',
+        }
+      ],
+      createdAt: new Date().toISOString(),
+    };
+
+    setTeamSessions((prev) => [...prev.filter(s => s.code !== code), newSession]);
+
+    // Save to Firestore
+    try {
+      await setDoc(doc(db, 'team_sessions', code), cleanFirestoreData(newSession));
+    } catch (err) {
+      console.warn('Firestore team_sessions write warning:', err);
+    }
+
+    // Automatically create an initial shared team document
+    await createBoard(`Tableau ${name.trim()}`, `Document partagé de l'équipe ${name.trim()}`, 'briefcase', '#4285F4', name.trim(), code);
+
+    showNotification(`Session d'équipe créée avec votre compte Google (${currentAuthUser.email}) ! Code : ${code}`);
+    return code;
+  };
+
+  const joinTeamSession = async (code: string): Promise<boolean> => {
+    const cleanCode = code.trim().toUpperCase();
+    if (!cleanCode) return false;
+
+    // Force Google Sign-In if not signed in
+    let currentAuthUser = user;
+    if (!currentAuthUser) {
+      try {
+        currentAuthUser = await loginWithGoogle();
+        setUser(currentAuthUser);
+      } catch (err) {
+        showNotification('Connexion Google requise pour rejoindre une équipe.');
+        return false;
+      }
+    }
+
+    const userName = currentAuthUser.displayName || currentAuthUser.email?.split('@')[0] || 'Membre Google';
+    const userId = currentAuthUser.uid;
+
+    // Try fetching existing session from Firestore or local state
+    let existingSession = teamSessions.find((s) => s.code === cleanCode);
+    try {
+      const docSnap = await import('firebase/firestore').then(m => m.getDoc(doc(db, 'team_sessions', cleanCode)));
+      if (docSnap.exists()) {
+        existingSession = { id: docSnap.id, ...docSnap.data() } as TeamSession;
+      }
+    } catch (e) {
+      console.warn('Firestore team_sessions read warning:', e);
+    }
+
+    const newMember: TeamMember = {
+      id: userId,
+      name: userName,
+      email: currentAuthUser.email || undefined,
+      joinedAt: new Date().toISOString(),
+      avatarColor: '#34A853',
+    };
+
+    const updatedMembers = existingSession?.members ? [...existingSession.members.filter(m => m.id !== userId), newMember] : [newMember];
+
+    const joinedSession: TeamSession = {
+      id: existingSession?.id || `team_${cleanCode}`,
+      code: cleanCode,
+      name: existingSession?.name || `Équipe ${cleanCode}`,
+      creatorId: existingSession?.creatorId || userId,
+      creatorName: existingSession?.creatorName || userName,
+      members: updatedMembers,
+      createdAt: existingSession?.createdAt || new Date().toISOString(),
+    };
+
+    setTeamSessions((prev) => [...prev.filter(s => s.code !== cleanCode), joinedSession]);
+
+    // Save/Update in Firestore
+    try {
+      await setDoc(doc(db, 'team_sessions', cleanCode), cleanFirestoreData(joinedSession), { merge: true });
+    } catch (e) {
+      console.warn('Firestore team_sessions update warning:', e);
+    }
+
+    // Create or select team board
+    await createBoard(`Tableau Équipe ${cleanCode}`, `Tableau partagé via le code ${cleanCode}`, 'briefcase', '#4285F4', joinedSession.name, cleanCode);
+
+    showNotification(`Vous avez rejoint l'équipe "${joinedSession.name}" (${cleanCode}) avec votre compte Google !`);
+    return true;
+  };
+
+  const leaveTeamSession = async (code: string) => {
+    const target = teamSessions.find((s) => s.code === code);
+    setTeamSessions((prev) => prev.filter((s) => s.code !== code));
+
+    // Remove user from Firestore team members if connected
+    if (user && target) {
+      try {
+        const remaining = target.members.filter(m => m.id !== user.uid);
+        await setDoc(doc(db, 'team_sessions', code), cleanFirestoreData({
+          ...target,
+          members: remaining
+        }), { merge: true });
+      } catch (e) {}
+    }
+
+    showNotification(target ? `Vous avez quitté l'équipe "${target.name}".` : `Session quittée.`);
+  };
 
   const [activeBoardId, setActiveBoardIdState] = useState<string>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_ACTIVE_BOARD_KEY);
@@ -346,7 +681,9 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     title: string, 
     description: string = '', 
     icon: string = 'folder', 
-    color: string = '#0078d4'
+    color: string = '#0078d4',
+    projectName?: string,
+    teamSessionCode?: string
   ): Promise<string> => {
     const newId = `board_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newBoard: BoardDocument = {
@@ -359,6 +696,9 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isCloud: !!user,
+      order: boards.length,
+      projectName: projectName?.trim() || undefined,
+      teamSessionCode: teamSessionCode?.trim() || undefined,
     };
 
     setBoards((prev) => [...prev, newBoard]);
@@ -760,8 +1100,23 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         syncStatus,
         lastSyncTime,
         boards,
+        sortedBoards,
         activeBoard,
         activeBoardId,
+        projects,
+        teamSessions,
+        boardSortPreference,
+        setBoardSortPreference,
+        reorderBoards,
+        moveBoardOrder,
+        createProject,
+        deleteProject,
+        renameProject,
+        assignBoardToProject,
+        reorderProjects,
+        createTeamSession,
+        joinTeamSession,
+        leaveTeamSession,
         tasks: filteredTasks,
         allTasks,
         categories: DEFAULT_CATEGORIES,

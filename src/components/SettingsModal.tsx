@@ -18,7 +18,10 @@ import {
   Info,
   History,
   ArrowDownCircle,
-  Tag
+  Tag,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 import { useSettings, THEME_COLOR_MAP, ThemeColor, BorderRadiusStyle, DisplayDensity, DefaultSort } from '../context/SettingsContext';
@@ -61,11 +64,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenAuthModal 
 }) => {
   const { user, lastSyncTime, saveCurrentDocument, exportBoardToFile, activeBoardId } = useTaskContext();
-  const { preferences, updatePreference, resetPreferences, getRoundedClass } = useSettings();
+  const { preferences, updatePreference, resetPreferences, getRoundedClass, effectiveTheme } = useSettings();
+  const isLight = effectiveTheme === 'light';
 
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
   const [activeTab, setActiveTab] = useState<'appearance' | 'tasks' | 'sync' | 'storage' | 'updates'>('appearance');
-  const [appVersion, setAppVersion] = useState('1.0.10');
+  const [appVersion, setAppVersion] = useState('1.2.0');
   const [updaterState, setUpdaterState] = useState<UpdaterStatusState>({ status: 'idle' });
   const [isChecking, setIsChecking] = useState(false);
 
@@ -325,6 +329,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* TAB 1: APPEARANCE */}
           {activeTab === 'appearance' && (
             <div className="space-y-4">
+              {/* Theme Mode Selector (System, Light, Dark) */}
+              <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
+                <span className="font-semibold text-white text-sm block">Mode d'affichage (Thème)</span>
+                <p className="text-[11px] text-slate-400">
+                  Choisissez entre le mode clair, sombre ou l'adaptation automatique au système d'exploitation :
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {[
+                    { id: 'system', label: 'Système (par défaut)', desc: 'Suit l\'apparence de votre système', icon: Monitor },
+                    { id: 'light', label: 'Mode Clair', desc: 'Style blanc lumineux Google Material', icon: Sun },
+                    { id: 'dark', label: 'Mode Sombre', desc: 'Style sombre élégant Material You', icon: Moon },
+                  ].map((t) => {
+                    const IconComp = t.icon;
+                    const isSelected = preferences.themeMode === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => updatePreference('themeMode', t.id as any)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-[#4285F4] bg-[#4285F4]/15 font-semibold text-white ring-1 ring-[#4285F4]/30'
+                            : 'border-white/10 hover:border-white/20 bg-black/20 text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <IconComp className={`w-4 h-4 ${isSelected ? 'text-[#4285F4]' : 'text-slate-400'}`} />
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#4285F4]" />}
+                        </div>
+                        <div>
+                          <span className="block text-xs font-medium">{t.label}</span>
+                          <span className="text-[10px] text-slate-400 mt-0.5 block">{t.desc}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
                 <span className="font-semibold text-white text-sm block">Couleur d'accentuation Google</span>
                 <p className="text-[11px] text-slate-400">
@@ -359,7 +402,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: 'extra', label: 'Ultra arrondi (24px)', desc: 'Style Google Material You' },
-                    { id: 'standard', label: 'Standard (16px)', desc: 'Style Workspace classique' },
+                    { id: 'standard', label: 'Standard (16px)', desc: 'Style Material classique' },
                     { id: 'minimal', label: 'Léger (8px)', desc: 'Coins subtilement adoucis' },
                   ].map((item) => (
                     <button

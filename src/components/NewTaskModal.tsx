@@ -130,7 +130,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
               <Plus className="w-4 h-4 stroke-[2.5]" />
             </div>
             <h3 className="text-sm font-bold text-white tracking-tight">
-              Nouvelle Tâche Workspace
+              Nouvelle Tâche
             </h3>
           </div>
           <button

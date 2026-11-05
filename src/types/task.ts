@@ -25,6 +25,24 @@ export interface Task {
   updatedAt?: string;
 }
 
+export interface TeamMember {
+  id: string;
+  name: string;
+  email?: string;
+  joinedAt: string;
+  avatarColor?: string;
+}
+
+export interface TeamSession {
+  id: string;
+  code: string; // 6-digit uppercase alphanumeric session code e.g. "TF-7892"
+  name: string;
+  creatorId: string;
+  creatorName?: string;
+  members: TeamMember[];
+  createdAt: string;
+}
+
 export interface BoardDocument {
   id: string;
   title: string;
@@ -35,7 +53,12 @@ export interface BoardDocument {
   createdAt?: string;
   updatedAt?: string;
   isCloud?: boolean;
+  order?: number;
+  projectName?: string; // Nom du projet de rattachement
+  teamSessionCode?: string; // Code de session d'équipe si document partagé
 }
+
+export type BoardSortPreference = 'custom' | 'title-asc' | 'title-desc' | 'date-desc' | 'date-asc';
 
 export interface TagCategoryDefinition {
   id: string;

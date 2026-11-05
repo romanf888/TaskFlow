@@ -4,11 +4,25 @@ import { createSampleIllustration } from '../utils/sampleIllustrations';
 export const INITIAL_BOARDS: BoardDocument[] = [
   {
     id: 'board-pro-default',
-    title: 'Projet Professionnel',
-    description: 'Organisation des livrables, développement logiciel et sprint en cours',
-    icon: 'briefcase',
+    title: 'Sprints & Développement',
+    description: 'Organisation des livrables, fonctionnalités et sprints',
+    icon: 'code',
     color: '#0078d4', // Windows Blue
     ownerId: 'local-user',
+    projectName: 'Projet Professionnel',
+    order: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'board-pro-design',
+    title: 'Design & Maquettes UI',
+    description: 'Composants graphiques, palettes et revues créatives',
+    icon: 'briefcase',
+    color: '#ec4899', // Pink
+    ownerId: 'local-user',
+    projectName: 'Projet Professionnel',
+    order: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -19,6 +33,8 @@ export const INITIAL_BOARDS: BoardDocument[] = [
     icon: 'home',
     color: '#8b5cf6', // Violet
     ownerId: 'local-user',
+    projectName: 'Personnel',
+    order: 2,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },

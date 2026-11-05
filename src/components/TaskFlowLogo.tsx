@@ -57,11 +57,6 @@ export const TaskFlowLogo: React.FC<TaskFlowLogoProps> = ({
           <span className="font-bold text-white text-base font-sans tracking-tight">
             Task<span className="text-[#4285F4]">Flow</span>
           </span>
-          {variant === 'full' && (
-            <span className="ml-1.5 px-2 py-0.5 text-[10px] font-semibold bg-[#4285F4]/15 text-[#8ab4f8] border border-[#4285F4]/30 rounded-full">
-              Workspace
-            </span>
-          )}
         </div>
       )}
     </div>

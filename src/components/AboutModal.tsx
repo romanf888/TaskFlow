@@ -33,7 +33,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
           <div className="flex items-center space-x-3.5 p-3.5 bg-[#282a2d] rounded-2xl border border-white/10">
             <TaskFlowLogo size={36} showText={false} />
             <div>
-              <h4 className="font-bold text-white text-sm">TaskFlow Workspace</h4>
+              <h4 className="font-bold text-white text-sm">TaskFlow</h4>
               <p className="text-slate-400 text-xs mt-0.5">
                 Gestionnaire de tâches moderne avec interface inspirée du design Google Material You, synchronisation cloud en direct et multi-projets.
               </p>
@@ -46,7 +46,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
             <div className="space-y-2 text-slate-300 bg-[#282a2d]/60 p-3.5 rounded-2xl border border-white/5">
               <div className="flex items-start space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-[#FBBC04] shrink-0 mt-0.5" />
-                <span><strong>Kanban cerné :</strong> 3 colonnes essentielles ("À faire", "En cours", "Fait") avec glisser-déposer fluide.</span>
+                <span><strong>3 Colonnes fluides :</strong> ("À faire", "En cours", "Fait") avec glisser-déposer intuitif à la souris.</span>
               </div>
               <div className="flex items-start space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-[#4285F4] shrink-0 mt-0.5" />
@@ -96,7 +96,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
 
         {/* Footer */}
         <div className="px-6 py-3.5 bg-[#191a1b] border-t border-white/10 flex items-center justify-between">
-          <span className="text-[11px] text-slate-500">TaskFlow Workspace v1.0.6</span>
+          <span className="text-[11px] text-slate-500">TaskFlow</span>
           <button
             onClick={onClose}
             className="px-5 py-2 bg-white/10 hover:bg-white/15 text-white rounded-full text-xs font-semibold transition-colors cursor-pointer"

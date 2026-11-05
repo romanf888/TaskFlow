@@ -193,7 +193,7 @@ async function createWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    title: 'TaskFlow Workspace',
+    title: 'TaskFlow',
     icon: fs.existsSync(appIconPath) ? appIconPath : undefined,
     backgroundColor: '#131314',
     frame: false,

@@ -37,11 +37,13 @@ export const DocumentManagerModal: React.FC<DocumentManagerModalProps> = ({ onCl
     importBoardFromFile,
     tasks,
     user,
+    projects,
   } = useTaskContext();
 
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newProject, setNewProject] = useState('');
   const [newIcon, setNewIcon] = useState('folder');
   const [newColor, setNewColor] = useState('#0078d4');
 
@@ -54,10 +56,11 @@ export const DocumentManagerModal: React.FC<DocumentManagerModalProps> = ({ onCl
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    await createBoard(newTitle.trim(), newDescription.trim(), newIcon, newColor);
+    await createBoard(newTitle.trim(), newDescription.trim(), newIcon, newColor, newProject || undefined);
     setIsCreating(false);
     setNewTitle('');
     setNewDescription('');
+    setNewProject('');
     onClose();
   };
 
@@ -180,6 +183,20 @@ export const DocumentManagerModal: React.FC<DocumentManagerModalProps> = ({ onCl
                   placeholder="Ex: Tâches liées au sprint technique et aux livrables..."
                   className="w-full bg-[#242b3e] border border-white/15 rounded-md px-3 py-1.5 text-slate-100 text-xs focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1">Rattacher à un projet (Optionnel)</label>
+                <select
+                  value={newProject}
+                  onChange={(e) => setNewProject(e.target.value)}
+                  className="w-full bg-[#242b3e] border border-white/15 rounded-md px-3 py-1.5 text-slate-100 text-xs focus:outline-none"
+                >
+                  <option value="">-- Aucun projet (Document autonome) --</option>
+                  {projects.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Icon & Color selector */}

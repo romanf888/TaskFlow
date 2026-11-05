@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type ThemeColor = 'google-blue' | 'google-green' | 'google-red' | 'google-yellow' | 'google-purple';
+export type ThemeMode = 'system' | 'light' | 'dark';
 export type SurfaceTheme = 'google-dark' | 'eclipse-dark' | 'material-light';
 export type BorderRadiusStyle = 'extra' | 'standard' | 'minimal';
 export type DisplayDensity = 'comfortable' | 'compact';
 export type DefaultSort = 'manual' | 'priority' | 'date-desc' | 'date-asc';
 
 export interface UserPreferences {
+  themeMode: ThemeMode; // 'system' (par défaut), 'light', 'dark'
   surfaceTheme: SurfaceTheme;
   themeColor: ThemeColor;
   borderRadius: BorderRadiusStyle;
@@ -21,10 +23,11 @@ export interface UserPreferences {
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
+  themeMode: 'system', // Par défaut sur système comme demandé
   surfaceTheme: 'google-dark',
   themeColor: 'google-blue',
   borderRadius: 'extra', // Google Material You extra rounded
-  density: 'comfortable',
+  density: 'compact', // Par défaut plus compact pour afficher plus de tâches
   autoMoveDoneTasks: true,
   confirmDelete: true,
   showImageThumbnails: true,
@@ -34,7 +37,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   compactSidebar: false,
 };
 
-const PREFS_STORAGE_KEY = 'taskflow_user_preferences_v2';
+const PREFS_STORAGE_KEY = 'taskflow_user_preferences_v3';
 
 interface SettingsContextType {
   preferences: UserPreferences;
@@ -42,6 +45,8 @@ interface SettingsContextType {
   resetPreferences: () => void;
   accentColorHex: string;
   accentBgHex: string;
+  effectiveTheme: 'light' | 'dark';
+  setThemeMode: (mode: ThemeMode) => void;
   getRoundedClass: (element: 'card' | 'container' | 'pill' | 'button' | 'modal') => string;
 }
 
@@ -68,12 +73,57 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return DEFAULT_PREFERENCES;
   });
 
+  // Track system preference for dark/light mode
+  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      setSystemPrefersDark(e.matches);
+    };
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  const effectiveTheme: 'light' | 'dark' =
+    preferences.themeMode === 'system'
+      ? (systemPrefersDark ? 'dark' : 'light')
+      : preferences.themeMode;
+
   useEffect(() => {
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(preferences));
   }, [preferences]);
 
+  // Sync document root classes for global light/dark CSS
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      if (effectiveTheme === 'dark') {
+        root.classList.add('dark');
+        root.classList.remove('light');
+        document.body.style.backgroundColor = '#131314';
+        document.body.style.color = '#e3e3e3';
+      } else {
+        root.classList.add('light');
+        root.classList.remove('dark');
+        document.body.style.backgroundColor = '#f8f9fa';
+        document.body.style.color = '#202124';
+      }
+    }
+  }, [effectiveTheme]);
+
   const updatePreference = <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
     setPreferences((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const setThemeMode = (mode: ThemeMode) => {
+    updatePreference('themeMode', mode);
   };
 
   const resetPreferences = () => {
@@ -118,6 +168,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         resetPreferences,
         accentColorHex,
         accentBgHex,
+        effectiveTheme,
+        setThemeMode,
         getRoundedClass,
       }}
     >

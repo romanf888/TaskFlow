@@ -11,6 +11,8 @@ import { ImageLightboxModal } from './components/ImageLightboxModal';
 import { GoogleAuthModal } from './components/GoogleAuthModal';
 import { AboutModal } from './components/AboutModal';
 import { SettingsModal } from './components/SettingsModal';
+import { TeamModal } from './components/TeamModal';
+import { LandingPage } from './components/LandingPage';
 import { UpdateNotification } from './components/UpdateNotification';
 import { Task, TaskStatus } from './types/task';
 import { 
@@ -31,10 +33,14 @@ const MainAppContent: React.FC = () => {
     user 
   } = useTaskContext();
 
-  const { preferences, accentColorHex } = useSettings();
+  const { preferences, effectiveTheme, accentColorHex } = useSettings();
+  const isLight = effectiveTheme === 'light';
 
   // Sidebar toggle state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // View state: Landing Page / Presentation vs Main App Board
+  const [showLandingPage, setShowLandingPage] = useState(false);
 
   // Modals state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -44,6 +50,9 @@ const MainAppContent: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [teamModalMode, setTeamModalMode] = useState<'create' | 'join' | 'manage'>('create');
+  const [teamModalTargetCode, setTeamModalTargetCode] = useState<string | undefined>(undefined);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Global Keyboard Shortcuts
@@ -79,19 +88,39 @@ const MainAppContent: React.FC = () => {
     setIsNewTaskModalOpen(true);
   };
 
+  const handleOpenTeamModal = (mode: 'create' | 'join' | 'manage' = 'create', code?: string) => {
+    setTeamModalMode(mode);
+    setTeamModalTargetCode(code);
+    setIsTeamModalOpen(true);
+  };
+
   const doneCount = tasks.filter((t) => t.status === 'done').length;
   const inProgressCount = tasks.filter((t) => t.status === 'in_progress').length;
   const todoCount = tasks.filter((t) => t.status === 'todo').length;
 
-  // Background style based on preferences
-  const bgClass = preferences.surfaceTheme === 'eclipse-dark' 
-    ? 'bg-[#0c0e15]' 
-    : preferences.surfaceTheme === 'material-light' 
+  // Background style based on preferences & effectiveTheme
+  const bgClass = isLight 
     ? 'bg-[#f8f9fa] text-slate-800' 
+    : preferences.surfaceTheme === 'eclipse-dark'
+    ? 'bg-[#0c0e15] text-[#e3e3e3]'
     : 'bg-[#131314] text-[#e3e3e3]';
 
+  if (showLandingPage) {
+    return (
+      <LandingPage onLaunchApp={() => setShowLandingPage(false)} />
+    );
+  }
+
   return (
-    <div className={`flex h-screen w-screen ${bgClass} overflow-hidden font-sans select-none relative`}>
+    <div className={`flex h-screen w-screen ${bgClass} overflow-hidden font-sans select-none relative transition-colors`}>
+      {/* Mobile Sidebar Overlay Backdrop */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-20 animate-in fade-in"
+        />
+      )}
+
       {/* 1. Left Sidebar: Google Navigation Drawer */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -99,6 +128,8 @@ const MainAppContent: React.FC = () => {
         onOpenNewDocModal={() => setIsDocManagerOpen(true)}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+        onOpenTeamModal={handleOpenTeamModal}
+        onOpenLandingPage={() => setShowLandingPage(true)}
       />
 
       {/* Main Content Area */}
@@ -114,6 +145,8 @@ const MainAppContent: React.FC = () => {
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onOpenAboutModal={() => setIsAboutModalOpen(true)}
           onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+          onOpenTeamModal={() => handleOpenTeamModal('manage')}
+          onOpenLandingPage={() => setShowLandingPage(true)}
         />
 
         {/* 3. Main 3-Column Kanban Board (À faire, En cours, Fait) */}
@@ -122,51 +155,46 @@ const MainAppContent: React.FC = () => {
           onOpenNewTaskModalForStatus={handleOpenNewTaskForStatus}
         />
 
-        {/* 4. Minimal Google Workspace Bottom Status Bar */}
-        <footer className="h-7 bg-[#1e1f20] border-t border-white/10 px-4 flex items-center justify-between text-[11px] text-slate-400 select-none shrink-0">
+        {/* 4. Minimal Bottom Status Bar */}
+        <footer className={`h-7 border-t px-4 flex items-center justify-between text-[11px] select-none shrink-0 transition-colors ${
+          isLight ? 'bg-white border-slate-200 text-slate-500' : 'bg-[#1e1f20] border-white/10 text-slate-400'
+        }`}>
           <div className="flex items-center space-x-3 truncate">
-            <span className="flex items-center space-x-1.5 text-slate-200">
+            <span className={`flex items-center space-x-1.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
               <span 
                 className="w-2 h-2 rounded-full inline-block"
                 style={{ backgroundColor: activeBoard?.color || '#4285F4' }}
               />
               <span className="font-semibold truncate">{activeBoard?.title || 'Espace actif'}</span>
             </span>
-            <span className="text-slate-600">|</span>
+            <span className="opacity-30">|</span>
             <span>{tasks.length} tâche{tasks.length > 1 ? 's' : ''}</span>
-            <span className="text-slate-600 hidden sm:inline">|</span>
-            <span className="hidden sm:inline text-[#FBBC04]">{todoCount} à faire</span>
-            <span className="hidden sm:inline text-[#4285F4]">{inProgressCount} en cours</span>
-            <span className="hidden sm:inline text-[#34A853]">{doneCount} terminée{doneCount > 1 ? 's' : ''}</span>
+            <span className="opacity-30 hidden sm:inline">|</span>
+            <span className="hidden sm:inline text-[#FBBC04] font-medium">{todoCount} à faire</span>
+            <span className="hidden sm:inline text-[#4285F4] font-medium">{inProgressCount} en cours</span>
+            <span className="hidden sm:inline text-[#34A853] font-medium">{doneCount} terminée{doneCount > 1 ? 's' : ''}</span>
           </div>
 
           <div className="flex items-center space-x-3 shrink-0">
-            <div className="flex items-center space-x-1.5">
-              {user ? (
-                <span className="flex items-center space-x-1 text-[#34A853] font-medium">
-                  <CloudCheck className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Google Cloud Sync</span>
-                </span>
-              ) : (
-                <span className="flex items-center space-x-1 text-slate-400">
-                  <HardDrive className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Stockage local actif</span>
-                </span>
-              )}
-            </div>
-            <span className="text-slate-600">|</span>
+            <button
+              onClick={() => setShowLandingPage(true)}
+              className="hover:text-[#4285F4] transition-colors cursor-pointer hidden sm:inline"
+            >
+              🌐 Site & Wiki
+            </button>
+            <span className="opacity-30 hidden sm:inline">|</span>
             <button
               onClick={() => setIsSettingsModalOpen(true)}
-              className="hover:text-[#8ab4f8] transition-colors cursor-pointer flex items-center space-x-1"
+              className="hover:text-[#4285F4] transition-colors cursor-pointer flex items-center space-x-1"
               title="Paramètres de l'application"
             >
               <RotateCw className="w-3 h-3 text-[#4285F4]" />
               <span>Paramètres</span>
             </button>
-            <span className="text-slate-600">|</span>
+            <span className="opacity-30">|</span>
             <button
               onClick={() => setIsAboutModalOpen(true)}
-              className="hover:text-[#8ab4f8] transition-colors cursor-pointer"
+              className="hover:text-[#4285F4] transition-colors cursor-pointer"
             >
               Raccourcis
             </button>
@@ -206,6 +234,14 @@ const MainAppContent: React.FC = () => {
       {isDocManagerOpen && (
         <DocumentManagerModal
           onClose={() => setIsDocManagerOpen(false)}
+        />
+      )}
+
+      {isTeamModalOpen && (
+        <TeamModal
+          initialMode={teamModalMode}
+          targetSessionCode={teamModalTargetCode}
+          onClose={() => setIsTeamModalOpen(false)}
         />
       )}
 
