@@ -128,6 +128,26 @@
         }
       },
       "required": ["title", "status", "boardId", "ownerId"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User preferences and custom project category list",
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "description": "List of user project folder names"
+        },
+        "boardSortPreference": {
+          "type": "string",
+          "description": "User sort preference for documents"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      }
     }
   },
   "firestore": {
@@ -142,6 +162,12 @@
         "$ref": "#/entities/Task"
       },
       "description": "Tasks belonging to a specific board"
+    },
+    "/user_settings/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserSettings"
+      },
+      "description": "User settings and custom projects list"
     }
   }
 }

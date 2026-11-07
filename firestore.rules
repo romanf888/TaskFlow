@@ -69,5 +69,10 @@ service cloud.firestore {
         allow read, write: if isSignedIn();
       }
     }
+
+    // User Settings & Projects collection
+    match /user_settings/{userId} {
+      allow get, list, create, update, delete: if isSignedIn() && request.auth.uid == userId;
+    }
   }
 }

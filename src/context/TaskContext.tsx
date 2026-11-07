@@ -177,21 +177,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return [
-      {
-        id: 'team_demo_1',
-        code: 'TF-7892',
-        name: 'Équipe UEFN & Devs',
-        creatorId: 'user_admin',
-        creatorName: 'Romain',
-        members: [
-          { id: 'mem_1', name: 'Romain', joinedAt: new Date().toISOString(), avatarColor: '#4285F4' },
-          { id: 'mem_2', name: 'Alex', joinedAt: new Date().toISOString(), avatarColor: '#34A853' },
-          { id: 'mem_3', name: 'Sophie', joinedAt: new Date().toISOString(), avatarColor: '#FBBC04' },
-        ],
-        createdAt: new Date().toISOString(),
-      }
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -213,6 +199,14 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setBoardSortPreference = (pref: BoardSortPreference) => {
     setBoardSortPreferenceState(pref);
     localStorage.setItem(LOCAL_STORAGE_BOARD_SORT_KEY, pref);
+    if (user) {
+      setDoc(doc(db, 'user_settings', user.uid), cleanFirestoreData({
+        boardSortPreference: pref,
+        updatedAt: new Date().toISOString()
+      }), { merge: true }).catch((err) => {
+        console.warn('Failed to sync boardSortPreference:', err);
+      });
+    }
   };
 
   const sortedBoards = useMemo(() => {
@@ -283,33 +277,54 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showNotification(`Position du document mise à jour.`);
   };
 
+  const persistUserSettings = async (updatedProjects: string[], updatedSort?: BoardSortPreference) => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'user_settings', user.uid), cleanFirestoreData({
+        projects: updatedProjects,
+        boardSortPreference: updatedSort || boardSortPreference,
+        updatedAt: new Date().toISOString()
+      }), { merge: true });
+    } catch (e) {
+      console.warn('Failed to sync user_settings to Firestore:', e);
+    }
+  };
+
   const createProject = (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
     if (!projects.includes(trimmed)) {
-      setProjects((prev) => [...prev, trimmed]);
+      const updated = [...projects, trimmed];
+      setProjects(updated);
+      persistUserSettings(updated);
       showNotification(`Nouveau projet créé : "${trimmed}"`);
     }
   };
 
   const deleteProject = (name: string) => {
-    setProjects((prev) => prev.filter((p) => p !== name));
+    const updated = projects.filter((p) => p !== name);
+    setProjects(updated);
     setBoards((prev) => prev.map((b) => b.projectName === name ? { ...b, projectName: undefined } : b));
+    persistUserSettings(updated);
     showNotification(`Projet "${name}" supprimé.`);
   };
 
   const renameProject = (oldName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName) return;
-    setProjects((prev) => prev.map((p) => p === oldName ? trimmed : p));
+    const updated = projects.map((p) => p === oldName ? trimmed : p);
+    setProjects(updated);
     setBoards((prev) => prev.map((b) => b.projectName === oldName ? { ...b, projectName: trimmed } : b));
+    persistUserSettings(updated);
     showNotification(`Projet renommé en "${trimmed}".`);
   };
 
   const assignBoardToProject = (boardId: string, projectName?: string) => {
     const trimmed = projectName?.trim() || undefined;
     if (trimmed && !projects.includes(trimmed)) {
-      setProjects((prev) => [...prev, trimmed]);
+      const updated = [...projects, trimmed];
+      setProjects(updated);
+      persistUserSettings(updated);
     }
     updateBoard(boardId, { projectName: trimmed });
     showNotification(trimmed ? `Document rattaché à "${trimmed}"` : `Document retiré du projet.`);
@@ -317,6 +332,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const reorderProjects = (newProjects: string[]) => {
     setProjects(newProjects);
+    persistUserSettings(newProjects);
     showNotification('Ordre des projets mis à jour.');
   };
 
@@ -523,23 +539,29 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, [showNotification]);
 
-  // Real-time listener for joined Team Sessions
+  // Real-time listener for joined Team Sessions (Only when user is authenticated)
   useEffect(() => {
-    if (teamSessions.length === 0) return;
+    if (!user || teamSessions.length === 0) return;
 
     const unsubs: (() => void)[] = [];
     teamSessions.forEach((session) => {
       if (!session.code) return;
       try {
         const sessionRef = doc(db, 'team_sessions', session.code);
-        const unsub = onSnapshot(sessionRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const updatedData = { id: docSnap.id, ...docSnap.data() } as TeamSession;
-            setTeamSessions((prev) =>
-              prev.map((s) => (s.code === updatedData.code ? updatedData : s))
-            );
+        const unsub = onSnapshot(
+          sessionRef, 
+          (docSnap) => {
+            if (docSnap.exists()) {
+              const updatedData = { id: docSnap.id, ...docSnap.data() } as TeamSession;
+              setTeamSessions((prev) =>
+                prev.map((s) => (s.code === updatedData.code ? updatedData : s))
+              );
+            }
+          },
+          (error) => {
+            console.warn(`Snapshot permission or error on team_sessions/${session.code}:`, error.message);
           }
-        });
+        );
         unsubs.push(unsub);
       } catch (e) {
         console.warn('Error subscribing to team session:', e);
@@ -549,7 +571,42 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       unsubs.forEach((u) => u());
     };
-  }, [teamSessions.map((s) => s.code).join(',')]);
+  }, [user, teamSessions.map((s) => s.code).join(',')]);
+
+  // Real-time listener for user projects & sort preferences across devices
+  useEffect(() => {
+    if (!user) return;
+
+    const userSettingsRef = doc(db, 'user_settings', user.uid);
+    const unsub = onSnapshot(
+      userSettingsRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (Array.isArray(data.projects)) {
+            setProjects(data.projects);
+          }
+          if (data.boardSortPreference && ['custom', 'title-asc', 'title-desc', 'date-desc', 'date-asc'].includes(data.boardSortPreference)) {
+            setBoardSortPreferenceState(data.boardSortPreference);
+          }
+        } else {
+          // Initialize user_settings in cloud with current projects on first login
+          setDoc(userSettingsRef, cleanFirestoreData({
+            projects,
+            boardSortPreference,
+            updatedAt: new Date().toISOString()
+          }), { merge: true }).catch((err) => {
+            console.warn('Initial user_settings creation warning:', err);
+          });
+        }
+      },
+      (error) => {
+        console.warn('user_settings sync warning:', error.message);
+      }
+    );
+
+    return () => unsub();
+  }, [user]);
 
   // Firestore Sync when User is authenticated (Personal + Shared Team Boards)
   useEffect(() => {
