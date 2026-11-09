@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version à publier (ex: 1.5.0)'
+        required: false
+        default: '1.5.0'
 
 jobs:
   release:
@@ -24,14 +30,21 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Sync package.json version with git tag
+      - name: Sync package.json version
         shell: bash
         env:
           RAW_TAG: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          CLEAN_VERSION="${RAW_TAG#v}"
-          echo "Processing version from tag: $CLEAN_VERSION"
-          node -e "const fs = require('fs'); let raw = process.env.CLEAN_VERSION || '1.2.2'; let parts = raw.split('.'); if (parts.length > 3) { raw = parts[0] + '.' + parts[1] + '.' + (parseInt(parts[2] || '0', 10) + parseInt(parts[3] || '0', 10)); } console.log('SemVer version:', raw); const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8')); pkg.version = raw; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
+          if [ -n "$INPUT_VERSION" ]; then
+            CLEAN_VERSION="${INPUT_VERSION#v}"
+          elif [[ "$RAW_TAG" == v* ]]; then
+            CLEAN_VERSION="${RAW_TAG#v}"
+          else
+            CLEAN_VERSION="1.5.0"
+          fi
+          echo "Processing version: $CLEAN_VERSION"
+          node -e "const fs = require('fs'); let raw = process.env.CLEAN_VERSION || '1.5.0'; let parts = raw.split('.'); if (parts.length > 3) { raw = parts[0] + '.' + parts[1] + '.' + (parseInt(parts[2] || '0', 10) + parseInt(parts[3] || '0', 10)); } console.log('SemVer version:', raw); const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8')); pkg.version = raw; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
 
       - name: Build Web App and Package Windows Installer (.exe)
         run: npm run electron:build
@@ -40,8 +53,11 @@ jobs:
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', github.event.inputs.version || '1.5.0') }}
+          name: TaskFlow Windows v${{ startsWith(github.ref, 'refs/tags/') && replace(github.ref_name, 'v', '') || (github.event.inputs.version || '1.5.0') }}
+          generate_release_notes: true
           files: |
             release/*.exe
             release/*.exe.blockmap

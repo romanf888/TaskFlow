@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Layers, 
@@ -31,7 +31,10 @@ import {
   Tag,
   Sun,
   Moon,
-  Edit2
+  Edit2,
+  Minus,
+  Square,
+  Maximize2
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 import { useSettings } from '../context/SettingsContext';
@@ -86,6 +89,44 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
     try {
       localStorage.setItem('taskflow_start_view_mode', mode);
     } catch {}
+  };
+
+  // Electron Window Controls (Minimize, Maximize / Restore, Close)
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    if ((window as any).electronAPI?.isMaximized) {
+      (window as any).electronAPI.isMaximized().then((max: boolean) => {
+        setIsMaximized(max);
+      }).catch(() => {});
+    }
+  }, []);
+
+  const handleMinimize = () => {
+    if ((window as any).electronAPI?.minimizeWindow) {
+      (window as any).electronAPI.minimizeWindow();
+    }
+  };
+
+  const handleMaximize = async () => {
+    if ((window as any).electronAPI?.maximizeWindow) {
+      await (window as any).electronAPI.maximizeWindow();
+      if ((window as any).electronAPI?.isMaximized) {
+        const max = await (window as any).electronAPI.isMaximized();
+        setIsMaximized(max);
+      } else {
+        setIsMaximized(prev => !prev);
+      }
+    } else {
+      setIsMaximized(prev => !prev);
+    }
+  };
+
+  const handleClose = () => {
+    if ((window as any).electronAPI?.closeWindow) {
+      (window as any).electronAPI.closeWindow();
+    }
   };
 
   // State for Saving Category / Workspace as a Preset (Gros Document)
@@ -380,31 +421,89 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
   };
 
   return (
-    <div className={`h-screen w-screen flex flex-col md:flex-row overflow-hidden font-sans select-none transition-colors ${
+    <div className={`h-screen w-screen flex flex-col overflow-hidden font-sans select-none transition-colors ${
       isLiquidGlass
         ? 'bg-[#050814] text-[#f5f5f7]'
         : isLight 
         ? 'bg-[#f4f5f7] text-slate-800' 
         : 'bg-[#121316] text-[#e3e3e3]'
     }`}>
-      {/* 1. Left Navigation Rail (Word / Office Start Screen Style) */}
-      <aside className={`w-full md:w-64 lg:w-72 shrink-0 border-r flex flex-col justify-between p-4 md:p-5 z-20 backdrop-blur-2xl transition-all ${
-        isLiquidGlass
-          ? 'bg-[#090d1c]/80 border-white/15 text-slate-200 shadow-2xl'
-          : isLight 
-          ? 'bg-white/90 border-slate-200 text-slate-800 shadow-sm' 
-          : 'bg-[#18191c]/90 border-white/10 text-slate-200'
-      }`}>
-        {/* Brand Header */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-white/10">
-            <div className="flex items-center space-x-2.5">
-              <TaskFlowLogo size={32} showText={true} />
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF] font-mono font-bold">
-                v1.4.0
-              </span>
+      {/* Windows 11 Native Titlebar with Drag & Window Controls (Réduire, Agrandir, Fermer) */}
+      <div 
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        onDoubleClick={handleMaximize}
+        className={`h-9 w-full flex items-center justify-between px-3 border-b select-none shrink-0 z-50 backdrop-blur-md transition-colors ${
+          isLiquidGlass
+            ? 'bg-[#090d1c]/80 border-white/10 text-slate-300'
+            : isLight
+            ? 'bg-slate-100/90 border-slate-200 text-slate-700'
+            : 'bg-[#18191c]/95 border-white/10 text-slate-300'
+        }`}
+      >
+        <div className="flex items-center space-x-2 text-xs font-semibold pointer-events-none">
+          <TaskFlowLogo size={18} showText={false} />
+          <span className="text-[11px] font-medium tracking-tight">TaskFlow Windows</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF] font-mono font-bold">
+            v1.5.0
+          </span>
+        </div>
+
+        {/* Center Draggable Area */}
+        <div className="flex-1 h-full cursor-default" />
+
+        {/* Windows Native Controls: Réduire, Agrandir / Restaurer, Fermer */}
+        <div 
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className="flex items-center h-full -mr-3"
+        >
+          <button
+            onClick={handleMinimize}
+            className={`h-9 w-11 flex items-center justify-center transition-colors cursor-pointer ${
+              isLight ? 'hover:bg-black/10 text-slate-700' : 'hover:bg-white/10 text-slate-300 hover:text-white'
+            }`}
+            title="Réduire"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={handleMaximize}
+            className={`h-9 w-11 flex items-center justify-center transition-colors cursor-pointer ${
+              isLight ? 'hover:bg-black/10 text-slate-700' : 'hover:bg-white/10 text-slate-300 hover:text-white'
+            }`}
+            title={isMaximized ? "Restaurer" : "Agrandir"}
+          >
+            {isMaximized ? <Maximize2 className="w-3.5 h-3.5" /> : <Square className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={handleClose}
+            className="h-9 w-11 flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#EA4335] transition-colors cursor-pointer"
+            title="Fermer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Body Container (Sidebar + Main) */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+        {/* 1. Left Navigation Rail (Word / Office Start Screen Style) */}
+        <aside className={`w-full md:w-64 lg:w-72 shrink-0 border-r flex flex-col justify-between p-4 md:p-5 z-20 backdrop-blur-2xl transition-all ${
+          isLiquidGlass
+            ? 'bg-[#090d1c]/80 border-white/15 text-slate-200 shadow-2xl'
+            : isLight 
+            ? 'bg-white/90 border-slate-200 text-slate-800 shadow-sm' 
+            : 'bg-[#18191c]/90 border-white/10 text-slate-200'
+        }`}>
+          {/* Brand Header */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-white/10">
+              <div className="flex items-center space-x-2.5">
+                <TaskFlowLogo size={32} showText={true} />
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF] font-mono font-bold">
+                  v1.5.0
+                </span>
+              </div>
             </div>
-          </div>
 
           {/* Primary Hub Navigation Tabs */}
           <nav className="space-y-1.5 text-xs font-semibold">
@@ -1760,5 +1859,6 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
         )}
       </main>
     </div>
-  );
+  </div>
+);
 };
