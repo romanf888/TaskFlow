@@ -43,7 +43,10 @@ jobs:
           else
             CLEAN_VERSION="1.5.0"
           fi
-          echo "Processing version: $CLEAN_VERSION"
+          TAG_NAME="v$CLEAN_VERSION"
+          echo "Processing version: $CLEAN_VERSION (Tag: $TAG_NAME)"
+          echo "CLEAN_VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
           node -e "const fs = require('fs'); let raw = process.env.CLEAN_VERSION || '1.5.0'; let parts = raw.split('.'); if (parts.length > 3) { raw = parts[0] + '.' + parts[1] + '.' + (parseInt(parts[2] || '0', 10) + parseInt(parts[3] || '0', 10)); } console.log('SemVer version:', raw); const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8')); pkg.version = raw; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
 
       - name: Build Web App and Package Windows Installer (.exe)
@@ -55,8 +58,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', github.event.inputs.version || '1.5.0') }}
-          name: TaskFlow Windows v${{ startsWith(github.ref, 'refs/tags/') && replace(github.ref_name, 'v', '') || (github.event.inputs.version || '1.5.0') }}
+          tag_name: ${{ env.TAG_NAME }}
+          name: TaskFlow Windows ${{ env.TAG_NAME }}
           generate_release_notes: true
           files: |
             release/*.exe
