@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type ThemeColor = 'google-blue' | 'google-green' | 'google-red' | 'google-yellow' | 'google-purple';
-export type ThemeMode = 'system' | 'light' | 'dark';
-export type SurfaceTheme = 'google-dark' | 'eclipse-dark' | 'material-light';
+export type ThemeMode = 'system' | 'light' | 'dark' | 'liquid-glass';
+export type SurfaceTheme = 'liquid-glass' | 'google-dark' | 'eclipse-dark' | 'material-light';
 export type BorderRadiusStyle = 'extra' | 'standard' | 'minimal';
 export type DisplayDensity = 'comfortable' | 'compact';
 export type DefaultSort = 'manual' | 'priority' | 'date-desc' | 'date-asc';
 
 export interface UserPreferences {
-  themeMode: ThemeMode; // 'system' (par défaut), 'light', 'dark'
+  themeMode: ThemeMode; // 'system' (par défaut), 'light', 'dark', 'liquid-glass'
   surfaceTheme: SurfaceTheme;
   themeColor: ThemeColor;
   borderRadius: BorderRadiusStyle;
@@ -23,11 +23,11 @@ export interface UserPreferences {
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
-  themeMode: 'system', // Par défaut sur système comme demandé
-  surfaceTheme: 'google-dark',
+  themeMode: 'system', // Par défaut sur système
+  surfaceTheme: 'liquid-glass', // iOS 27 Liquid Glass par défaut pour l'esthétique Apple
   themeColor: 'google-blue',
-  borderRadius: 'extra', // Google Material You extra rounded
-  density: 'compact', // Par défaut plus compact pour afficher plus de tâches
+  borderRadius: 'extra', // Apple Squircle extra rounded
+  density: 'compact', // Par défaut plus compact pour afficher un maximum de tâches
   autoMoveDoneTasks: true,
   confirmDelete: true,
   showImageThumbnails: true,
@@ -45,7 +45,8 @@ interface SettingsContextType {
   resetPreferences: () => void;
   accentColorHex: string;
   accentBgHex: string;
-  effectiveTheme: 'light' | 'dark';
+  effectiveTheme: 'light' | 'dark' | 'liquid-glass';
+  isLiquidGlass: boolean;
   setThemeMode: (mode: ThemeMode) => void;
   getRoundedClass: (element: 'card' | 'container' | 'pill' | 'button' | 'modal') => string;
 }
@@ -53,11 +54,11 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const THEME_COLOR_MAP: Record<ThemeColor, { name: string; hex: string; bgHex: string; borderHex: string }> = {
-  'google-blue': { name: 'Google Bleu', hex: '#4285F4', bgHex: 'rgba(66, 133, 244, 0.15)', borderHex: 'rgba(66, 133, 244, 0.35)' },
-  'google-green': { name: 'Google Vert', hex: '#34A853', bgHex: 'rgba(52, 168, 83, 0.15)', borderHex: 'rgba(52, 168, 83, 0.35)' },
-  'google-yellow': { name: 'Google Ambre', hex: '#FBBC05', bgHex: 'rgba(251, 188, 5, 0.15)', borderHex: 'rgba(251, 188, 5, 0.35)' },
-  'google-red': { name: 'Google Corail', hex: '#EA4335', bgHex: 'rgba(234, 67, 53, 0.15)', borderHex: 'rgba(234, 67, 53, 0.35)' },
-  'google-purple': { name: 'Google Indigo', hex: '#A142F4', bgHex: 'rgba(161, 66, 244, 0.15)', borderHex: 'rgba(161, 66, 244, 0.35)' },
+  'google-blue': { name: 'Apple Bleu', hex: '#007AFF', bgHex: 'rgba(0, 122, 255, 0.15)', borderHex: 'rgba(0, 122, 255, 0.35)' },
+  'google-green': { name: 'Apple Vert', hex: '#34C759', bgHex: 'rgba(52, 199, 89, 0.15)', borderHex: 'rgba(52, 199, 89, 0.35)' },
+  'google-yellow': { name: 'Apple Orange', hex: '#FF9500', bgHex: 'rgba(255, 149, 0, 0.15)', borderHex: 'rgba(255, 149, 0, 0.35)' },
+  'google-red': { name: 'Apple Rouge', hex: '#FF3B30', bgHex: 'rgba(255, 59, 48, 0.15)', borderHex: 'rgba(255, 59, 48, 0.35)' },
+  'google-purple': { name: 'Apple Violet', hex: '#AF52DE', bgHex: 'rgba(175, 82, 222, 0.15)', borderHex: 'rgba(175, 82, 222, 0.35)' },
 };
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -91,29 +92,42 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
 
-  const effectiveTheme: 'light' | 'dark' =
-    preferences.themeMode === 'system'
-      ? (systemPrefersDark ? 'dark' : 'light')
+  const effectiveTheme: 'light' | 'dark' | 'liquid-glass' =
+    preferences.themeMode === 'liquid-glass'
+      ? 'liquid-glass'
+      : preferences.themeMode === 'system'
+      ? (systemPrefersDark ? (preferences.surfaceTheme === 'liquid-glass' ? 'liquid-glass' : 'dark') : 'light')
       : preferences.themeMode;
 
+  const isLiquidGlass = effectiveTheme === 'liquid-glass' || preferences.themeMode === 'liquid-glass';
+
   useEffect(() => {
-    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(preferences));
+    try {
+      localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(preferences));
+    } catch (e) {
+      console.warn('[SettingsContext] Failed to save preferences to localStorage:', e);
+    }
   }, [preferences]);
 
   // Sync document root classes for global light/dark CSS
   useEffect(() => {
     if (typeof document !== 'undefined') {
       const root = document.documentElement;
-      if (effectiveTheme === 'dark') {
-        root.classList.add('dark');
+      if (effectiveTheme === 'liquid-glass') {
+        root.classList.add('dark', 'liquid-glass');
         root.classList.remove('light');
-        document.body.style.backgroundColor = '#131314';
-        document.body.style.color = '#e3e3e3';
+        document.body.style.backgroundColor = '#050711';
+        document.body.style.color = '#f5f5f7';
+      } else if (effectiveTheme === 'dark') {
+        root.classList.add('dark');
+        root.classList.remove('light', 'liquid-glass');
+        document.body.style.backgroundColor = '#000000';
+        document.body.style.color = '#f5f5f7';
       } else {
         root.classList.add('light');
-        root.classList.remove('dark');
-        document.body.style.backgroundColor = '#f8f9fa';
-        document.body.style.color = '#202124';
+        root.classList.remove('dark', 'liquid-glass');
+        document.body.style.backgroundColor = '#f5f5f7';
+        document.body.style.color = '#1d1d1f';
       }
     }
   }, [effectiveTheme]);
@@ -130,20 +144,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setPreferences(DEFAULT_PREFERENCES);
   };
 
-  const accentColorHex = THEME_COLOR_MAP[preferences.themeColor]?.hex || '#4285F4';
-  const accentBgHex = THEME_COLOR_MAP[preferences.themeColor]?.bgHex || 'rgba(66, 133, 244, 0.15)';
+  const accentColorHex = THEME_COLOR_MAP[preferences.themeColor]?.hex || '#007AFF';
+  const accentBgHex = THEME_COLOR_MAP[preferences.themeColor]?.bgHex || 'rgba(0, 122, 255, 0.15)';
 
   const getRoundedClass = (element: 'card' | 'container' | 'pill' | 'button' | 'modal') => {
     if (element === 'pill') return 'rounded-full';
 
     switch (preferences.borderRadius) {
-      case 'extra': // Google Material You (Ultra rounded)
+      case 'extra': // Apple Squircle / Ultra rounded
         if (element === 'card') return 'rounded-2xl';
         if (element === 'container') return 'rounded-3xl';
         if (element === 'modal') return 'rounded-3xl';
         if (element === 'button') return 'rounded-xl';
         return 'rounded-2xl';
-      case 'standard': // Standard Google Workspace
+      case 'standard': // Standard Apple
         if (element === 'card') return 'rounded-xl';
         if (element === 'container') return 'rounded-2xl';
         if (element === 'modal') return 'rounded-2xl';
@@ -169,6 +183,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         accentColorHex,
         accentBgHex,
         effectiveTheme,
+        isLiquidGlass,
         setThemeMode,
         getRoundedClass,
       }}

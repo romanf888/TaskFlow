@@ -33,36 +33,48 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
           <div className="flex items-center space-x-3.5 p-3.5 bg-[#282a2d] rounded-2xl border border-white/10">
             <TaskFlowLogo size={36} showText={false} />
             <div>
-              <h4 className="font-bold text-white text-sm">TaskFlow</h4>
+              <div className="flex items-center space-x-2">
+                <h4 className="font-bold text-white text-sm">TaskFlow</h4>
+                <span className="px-2 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF] border border-[#007AFF]/40 text-[10px] font-mono font-bold">
+                  v1.4.0
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 text-[10px] font-medium">
+                  Gros Document & Presets Edition
+                </span>
+              </div>
               <p className="text-slate-400 text-xs mt-0.5">
-                Gestionnaire de tâches moderne avec interface inspirée du design Google Material You, synchronisation cloud en direct et multi-projets.
+                Gestionnaire de tâches avec page d'accueil Word-style, Gros Document Unifié multi-catégories, Preset personnalisés, thème Liquid Glass iOS 27 et synchronisation cloud.
               </p>
             </div>
           </div>
 
           {/* Points forts */}
           <div className="space-y-2">
-            <h5 className="font-semibold text-slate-200">Fonctionnalités clés :</h5>
+            <h5 className="font-semibold text-slate-200">Nouveautés & fonctionnalités v1.4.0 :</h5>
             <div className="space-y-2 text-slate-300 bg-[#282a2d]/60 p-3.5 rounded-2xl border border-white/5">
               <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#007AFF] shrink-0 mt-0.5" />
+                <span><strong>Gros Document Unifié :</strong> Regroupement de toutes vos catégories (Développements, Scolaire, Personnel) et sous-projets au sein d'un document maître unique.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <span><strong>Enregistrement en Preset global :</strong> Sauvegarde en un clic de l'intégralité de vos espaces comme modèle réutilisable.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <span><strong>Page d'accueil & Bibliothèque de modèles :</strong> Interface style Word pour démarrer un document vierge, charger un preset ou créer des modèles.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#34C759] shrink-0 mt-0.5" />
+                <span><strong>Thème  Liquid Glass (iOS 27) :</strong> Translucidité avancée, réfraction dynamique et flou d'ambiance néon.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <span><strong>Tâches infinies par colonne (∞) :</strong> Défilement optimisé et suppression de la limite de 11 tâches.</span>
+              </div>
+              <div className="flex items-start space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-[#FBBC04] shrink-0 mt-0.5" />
-                <span><strong>3 Colonnes fluides :</strong> ("À faire", "En cours", "Fait") avec glisser-déposer intuitif à la souris.</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-[#4285F4] shrink-0 mt-0.5" />
-                <span><strong>Style Google Material You :</strong> Bords ultra-arrondis, barre de recherche en pilule, et thème sombre doux.</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-[#34A853] shrink-0 mt-0.5" />
-                <span><strong>Multi-appareils & Cloud :</strong> Synchronisation temps réel automatique via Firebase Firestore avec votre compte Google.</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-[#EA4335] shrink-0 mt-0.5" />
-                <span><strong>Multi-projets (.taskflow) :</strong> Gestion de plusieurs documents séparés pour scinder projets pro et personnels.</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-[#8ab4f8] shrink-0 mt-0.5" />
-                <span><strong>Déploiement simultané :</strong> Disponible en application de bureau Windows (.exe) et en version Web complète (GitHub Pages).</span>
+                <span><strong>Mises à jour interactives :</strong> Boîte de dialogue pour télécharger et installer ou reporter plus tard.</span>
               </div>
             </div>
           </div>
@@ -83,10 +95,14 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
                 <kbd className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 font-mono text-white text-[10px]">Ctrl + N</kbd>
               </div>
               <div className="p-2.5 rounded-xl bg-[#282a2d] border border-white/5 flex justify-between items-center">
+                <span className="text-slate-400">Accueil & Modèles</span>
+                <kbd className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 font-mono text-white text-[10px]">Ctrl + H</kbd>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[#282a2d] border border-white/5 flex justify-between items-center">
                 <span className="text-slate-400">Sauvegarder</span>
                 <kbd className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 font-mono text-white text-[10px]">Ctrl + S</kbd>
               </div>
-              <div className="p-2.5 rounded-xl bg-[#282a2d] border border-white/5 flex justify-between items-center">
+              <div className="p-2.5 rounded-xl bg-[#282a2d] border border-white/5 flex justify-between items-center col-span-2 sm:col-span-1">
                 <span className="text-slate-400">Fermer la boîte</span>
                 <kbd className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 font-mono text-white text-[10px]">Échap</kbd>
               </div>

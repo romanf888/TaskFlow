@@ -220,10 +220,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           className="hidden" 
         />
 
-        {/* Google Material Header */}
-        <div className="px-6 py-4 bg-[#191a1b] border-b border-white/10 flex items-center justify-between">
+        {/* Apple Style Header */}
+        <div className="px-6 py-4 bg-[#1c1c1e] border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center space-x-2.5 truncate pr-4">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#4285F4]"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#007AFF]"></span>
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               {isEditing ? 'Édition de la tâche' : 'Détails de la tâche'}
             </span>

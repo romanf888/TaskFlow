@@ -19,9 +19,11 @@ import {
   Sun,
   Moon,
   Monitor,
+  Sparkles,
   Users,
   Globe,
-  BookOpen
+  BookOpen,
+  Home
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 import { useSettings } from '../context/SettingsContext';
@@ -35,7 +37,7 @@ interface TopHeaderProps {
   onOpenAboutModal: () => void;
   onOpenSettingsModal?: () => void;
   onOpenTeamModal?: () => void;
-  onOpenLandingPage?: () => void;
+  onOpenHomeScreen?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -46,7 +48,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenAboutModal,
   onOpenSettingsModal,
   onOpenTeamModal,
-  onOpenLandingPage,
+  onOpenHomeScreen,
 }) => {
   const {
     boards,
@@ -59,7 +61,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     user,
   } = useTaskContext();
 
-  const { preferences, effectiveTheme, setThemeMode } = useSettings();
+  const { preferences, effectiveTheme, setThemeMode, isLiquidGlass } = useSettings();
   const isLight = effectiveTheme === 'light';
 
   const [showAppsMenu, setShowAppsMenu] = useState(false);
@@ -67,7 +69,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const [isMaximized, setIsMaximized] = useState(false);
 
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
-  const activeColor = activeBoard?.color || '#4285F4';
+  const activeColor = activeBoard?.color || '#007AFF';
 
   const handleMinimize = () => {
     if ((window as any).electronAPI?.minimizeWindow) {
@@ -98,6 +100,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       setThemeMode('light');
     } else if (preferences.themeMode === 'light') {
       setThemeMode('dark');
+    } else if (preferences.themeMode === 'dark') {
+      setThemeMode('liquid-glass');
     } else {
       setThemeMode('system');
     }
@@ -106,8 +110,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   return (
     <header 
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      className={`px-4 py-2 flex items-center justify-between gap-3 text-xs z-20 select-none shadow-xs shrink-0 border-b transition-colors ${
-        isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#1e1f20] border-white/10 text-slate-200'
+      className={`px-4 py-2 flex items-center justify-between gap-3 text-xs z-20 select-none shrink-0 border-b transition-all backdrop-blur-2xl ${
+        isLiquidGlass
+          ? 'bg-[#090e1d]/60 border-white/20 text-slate-100 shadow-xl shadow-cyan-950/20'
+          : isLight 
+          ? 'bg-white/80 border-black/10 text-slate-900 shadow-sm' 
+          : 'bg-[#1c1c1e]/80 border-white/10 text-slate-100 shadow-lg shadow-black/40'
       }`}
     >
       {/* Left: Hamburger menu + TaskFlow Logo + Document badge */}
@@ -218,22 +226,30 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} 
         className="flex items-center space-x-1 shrink-0"
       >
-        {/* Quick Theme Toggle (System / Light / Dark) */}
+        {/* Quick Theme Toggle (System / Light / Dark / Liquid Glass iOS 27) */}
         <button
           onClick={cycleTheme}
-          className={`p-2 rounded-full transition-colors cursor-pointer ${
-            isLight ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-white/10 text-slate-300 hover:text-white'
+          className={`p-2 rounded-full transition-all cursor-pointer ${
+            isLiquidGlass
+              ? 'hover:bg-cyan-500/20 text-cyan-300 bg-cyan-500/15 border border-cyan-400/40 shadow-sm shadow-cyan-500/20'
+              : isLight 
+              ? 'hover:bg-slate-100 text-slate-700' 
+              : 'hover:bg-white/10 text-slate-300 hover:text-white'
           }`}
           title={`Thème actuel : ${
-            preferences.themeMode === 'system' 
+            preferences.themeMode === 'liquid-glass'
+              ? ' Liquid Glass (iOS 27)'
+              : preferences.themeMode === 'system' 
               ? 'Système (automatique)' 
               : preferences.themeMode === 'light' 
               ? 'Mode Clair' 
               : 'Mode Sombre'
           } (Cliquer pour alterner)`}
         >
-          {preferences.themeMode === 'system' ? (
-            <Monitor className="w-4 h-4 text-[#4285F4]" />
+          {preferences.themeMode === 'liquid-glass' ? (
+            <Sparkles className="w-4 h-4 text-cyan-300 animate-pulse" />
+          ) : preferences.themeMode === 'system' ? (
+            <Monitor className="w-4 h-4 text-[#007AFF]" />
           ) : preferences.themeMode === 'light' ? (
             <Sun className="w-4 h-4 text-amber-500" />
           ) : (
@@ -254,19 +270,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </button>
         )}
 
-        {/* Presentation Site & Wiki toggle */}
-        {onOpenLandingPage && (
+        {/* Home & Templates Screen */}
+        {onOpenHomeScreen && (
           <button
-            onClick={onOpenLandingPage}
-            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-full border transition-colors cursor-pointer text-xs font-semibold ${
-              isLight 
+            onClick={onOpenHomeScreen}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer text-xs font-semibold ${
+              isLiquidGlass
+                ? 'bg-cyan-500/15 hover:bg-cyan-500/25 border-cyan-400/30 text-cyan-200'
+                : isLight 
                 ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800' 
                 : 'bg-white/10 hover:bg-white/20 border-white/15 text-white'
             }`}
-            title="Ouvrir le site de présentation & Wiki"
+            title="Page d'accueil & Modèles (Ctrl+H)"
           >
-            <Globe className="w-3.5 h-3.5 text-[#4285F4]" />
-            <span className="hidden xs:inline">Site & Wiki</span>
+            <Home className="w-3.5 h-3.5 text-[#007AFF]" />
+            <span className="hidden xs:inline">Accueil & Modèles</span>
           </button>
         )}
 
@@ -386,13 +404,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           )}
         </button>
 
-        {/* Google FAB Style "+ Créer" Button */}
+        {/* Apple Capsule Style "+ Créer" Button */}
         <button
           onClick={onOpenNewTaskModal}
-          className="flex items-center space-x-2 px-4 py-2 rounded-full font-semibold text-white bg-[#4285F4] hover:bg-[#3367d6] shadow-md shadow-[#4285F4]/30 active:scale-95 transition-all cursor-pointer text-xs ml-1"
+          className="flex items-center space-x-2 px-4 py-2 rounded-full font-semibold text-white bg-[#007AFF] hover:bg-[#0062cc] shadow-md shadow-[#007AFF]/30 apple-btn-active transition-all cursor-pointer text-xs ml-1"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span className="hidden md:inline font-sans">Créer</span>
+          <span className="hidden md:inline">Créer</span>
         </button>
 
         {/* Electron Window Actions (Frameless Native Window Controls) */}

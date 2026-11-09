@@ -21,7 +21,8 @@ import {
   Tag,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  Sparkles
 } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
 import { useSettings, THEME_COLOR_MAP, ThemeColor, BorderRadiusStyle, DisplayDensity, DefaultSort } from '../context/SettingsContext';
@@ -69,7 +70,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
   const [activeTab, setActiveTab] = useState<'appearance' | 'tasks' | 'sync' | 'storage' | 'updates'>('appearance');
-  const [appVersion, setAppVersion] = useState('1.2.0');
+  const [appVersion, setAppVersion] = useState('1.4.0');
   const [updaterState, setUpdaterState] = useState<UpdaterStatusState>({ status: 'idle' });
   const [isChecking, setIsChecking] = useState(false);
 
@@ -84,16 +85,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [releasesError, setReleasesError] = useState<string | null>(null);
 
   const fetchGitHubReleases = async () => {
+    // Releases list is only needed for desktop updates (.exe rollback)
+    if (!isElectron) return;
+
     setLoadingReleases(true);
     setReleasesError(null);
     try {
-      const res = await fetch('https://api.github.com/repos/romanf888/TaskFlow/releases');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch('https://api.github.com/repos/romanf888/TaskFlow/releases', {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: GitHubRelease[] = await res.json();
-      setGithubReleases(data);
-    } catch (err: any) {
-      console.error('Error fetching GitHub releases', err);
-      setReleasesError('Impossible de charger la liste des releases GitHub.');
+      setGithubReleases(Array.isArray(data) ? data : []);
+    } catch {
+      // Graceful fallback for offline, rate-limits or sandboxed iframe environments
+      setReleasesError('Information des releases GitHub accessible directement sur github.com/romanf888/TaskFlow.');
     } finally {
       setLoadingReleases(false);
     }
@@ -134,7 +146,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     calculateStorageSize();
-    fetchGitHubReleases();
+    if (isElectron) {
+      fetchGitHubReleases();
+    }
 
     if (window.electronAPI?.getAppVersion) {
       window.electronAPI.getAppVersion().then((v) => {
@@ -329,38 +343,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* TAB 1: APPEARANCE */}
           {activeTab === 'appearance' && (
             <div className="space-y-4">
-              {/* Theme Mode Selector (System, Light, Dark) */}
+              {/* Theme Mode Selector (System, Light, Dark, Liquid Glass iOS 27) */}
               <div className="bg-[#282a2d] p-4 rounded-2xl border border-white/10 space-y-3">
-                <span className="font-semibold text-white text-sm block">Mode d'affichage (Thème)</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white text-sm block">Mode d'affichage (Thème)</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/30 font-medium">
+                    Nouveau : Liquid Glass iOS 27
+                  </span>
+                </div>
                 <p className="text-[11px] text-slate-400">
-                  Choisissez entre le mode clair, sombre ou l'adaptation automatique au système d'exploitation :
+                  Choisissez entre le mode Liquid Glass futuriste, clair, sombre ou l'adaptation automatique au système :
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   {[
-                    { id: 'system', label: 'Système (par défaut)', desc: 'Suit l\'apparence de votre système', icon: Monitor },
-                    { id: 'light', label: 'Mode Clair', desc: 'Style blanc lumineux Google Material', icon: Sun },
-                    { id: 'dark', label: 'Mode Sombre', desc: 'Style sombre élégant Material You', icon: Moon },
+                    { 
+                      id: 'liquid-glass', 
+                      label: ' Liquid Glass', 
+                      sub: 'iOS 27 Glassmorphism',
+                      desc: 'Translucidité optique, réfraction dynamique et flou néon', 
+                      icon: Sparkles,
+                      isNew: true 
+                    },
+                    { 
+                      id: 'dark', 
+                      label: 'Mode Sombre', 
+                      sub: 'Apple Dark Mode',
+                      desc: 'Noir profond OLED et contrastes raffinés', 
+                      icon: Moon,
+                      isNew: false 
+                    },
+                    { 
+                      id: 'light', 
+                      label: 'Mode Clair', 
+                      sub: 'Apple Light Mode',
+                      desc: 'Blanc pur lumineux et verre satiné', 
+                      icon: Sun,
+                      isNew: false 
+                    },
+                    { 
+                      id: 'system', 
+                      label: 'Système', 
+                      sub: 'Automatique',
+                      desc: 'Suit l\'apparence de votre système d\'exploitation', 
+                      icon: Monitor,
+                      isNew: false 
+                    },
                   ].map((t) => {
                     const IconComp = t.icon;
                     const isSelected = preferences.themeMode === t.id;
+                    const isGlass = t.id === 'liquid-glass';
                     return (
                       <button
                         key={t.id}
                         type="button"
                         onClick={() => updatePreference('themeMode', t.id as any)}
-                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden ${
                           isSelected
-                            ? 'border-[#4285F4] bg-[#4285F4]/15 font-semibold text-white ring-1 ring-[#4285F4]/30'
-                            : 'border-white/10 hover:border-white/20 bg-black/20 text-slate-300'
+                            ? isGlass
+                              ? 'border-cyan-400/80 bg-gradient-to-br from-cyan-500/25 via-blue-600/20 to-purple-600/25 font-semibold text-white ring-1 ring-cyan-400/50 shadow-lg shadow-cyan-500/25'
+                              : 'border-[#007AFF] bg-[#007AFF]/15 font-semibold text-white ring-1 ring-[#007AFF]/30'
+                            : isGlass
+                              ? 'border-cyan-500/30 hover:border-cyan-400/60 bg-gradient-to-br from-cyan-950/30 to-blue-950/20 text-slate-200'
+                              : 'border-white/10 hover:border-white/20 bg-black/20 text-slate-300'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <IconComp className={`w-4 h-4 ${isSelected ? 'text-[#4285F4]' : 'text-slate-400'}`} />
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#4285F4]" />}
+                          <div className="flex items-center space-x-1.5">
+                            <IconComp className={`w-4 h-4 ${
+                              isSelected 
+                                ? isGlass ? 'text-cyan-300' : 'text-[#007AFF]' 
+                                : isGlass ? 'text-cyan-400' : 'text-slate-400'
+                            }`} />
+                            {t.isNew && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/30 font-bold uppercase tracking-wider">
+                                iOS 27
+                              </span>
+                            )}
+                          </div>
+                          {isSelected && <Check className={`w-3.5 h-3.5 ${isGlass ? 'text-cyan-300' : 'text-[#007AFF]'}`} />}
                         </div>
                         <div>
                           <span className="block text-xs font-medium">{t.label}</span>
-                          <span className="text-[10px] text-slate-400 mt-0.5 block">{t.desc}</span>
+                          <span className="text-[9.5px] text-slate-400 font-mono block">{t.sub}</span>
+                          <span className="text-[10px] text-slate-400 mt-1 block leading-tight">{t.desc}</span>
                         </div>
                       </button>
                     );
@@ -665,8 +730,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-white text-sm flex items-center space-x-2">
-                      <RotateCw className={`w-4 h-4 text-[#8ab4f8] ${isChecking ? 'animate-spin' : ''}`} />
-                      <span>Mises à jour automatiques (.exe)</span>
+                      <RotateCw className={`w-4 h-4 text-[#007AFF] ${isChecking ? 'animate-spin' : ''}`} />
+                      <span>Mises à jour avec confirmation (.exe)</span>
                     </h4>
                     <p className="text-slate-400 text-[11px]">
                       Version actuellement exécutée : <strong className="text-white font-mono bg-black/40 px-2 py-0.5 rounded border border-white/10">v{appVersion}</strong>
@@ -675,7 +740,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     onClick={handleCheckForUpdates}
                     disabled={isChecking}
-                    className="px-4 py-2 rounded-full text-xs font-semibold bg-[#4285F4] hover:bg-[#3367d6] disabled:opacity-50 text-white transition-all cursor-pointer flex items-center space-x-1.5 shadow-md shadow-blue-500/20"
+                    className="px-4 py-2 rounded-full text-xs font-semibold bg-[#007AFF] hover:bg-[#0062cc] disabled:opacity-50 text-white transition-all cursor-pointer flex items-center space-x-1.5 shadow-md shadow-blue-500/20"
                   >
                     {isChecking ? (
                       <>
@@ -690,6 +755,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
                   </button>
                 </div>
+
+                <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1">
+                  <span className="text-xs font-semibold text-cyan-300 flex items-center space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Installation contrôlée via Popup</span>
+                  </span>
+                  <p className="text-[11px] text-slate-300">
+                    Les mises à jour ne s'installent plus automatiquement à chaque lancement. Si une version est détectée, une boîte de dialogue interactive apparaît pour vous proposer de la télécharger et l'installer ou de la reporter à plus tard.
+                  </p>
+                </div>
+
+                {updaterState.status === 'available' && (
+                  <div className="p-3.5 bg-cyan-500/15 border border-cyan-500/35 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white flex items-center space-x-2">
+                        <Sparkles className="w-4 h-4 text-cyan-400" />
+                        <span>Nouvelle version v{updaterState.version || ''} disponible !</span>
+                      </span>
+                      <button
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('taskflow-show-update-popup', { detail: updaterState }));
+                        }}
+                        className="px-3.5 py-1.5 bg-[#007AFF] hover:bg-[#0062cc] text-white rounded-full text-xs font-semibold cursor-pointer shadow-sm apple-btn-active"
+                      >
+                        Ouvrir la boîte de dialogue
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Une mise à jour a été détectée. Vous pouvez la télécharger et l'installer immédiatement ou choisir de la reporter.
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                   <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-1">

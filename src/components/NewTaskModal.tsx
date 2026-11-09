@@ -123,13 +123,13 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
           className="hidden" 
         />
 
-        {/* Modal Header */}
-        <div className="px-6 py-4 bg-[#191a1b] border-b border-white/10 flex items-center justify-between">
+        {/* Modal Header — Apple Style */}
+        <div className="px-6 py-4 bg-[#1c1c1e] border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-7 h-7 rounded-full bg-[#4285F4]/20 text-[#8ab4f8] flex items-center justify-center">
+            <div className="w-7 h-7 rounded-full bg-[#007AFF]/20 text-[#007AFF] flex items-center justify-center">
               <Plus className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <h3 className="text-sm font-bold text-white tracking-tight">
+            <h3 className="text-sm font-semibold text-white tracking-tight">
               Nouvelle Tâche
             </h3>
           </div>
@@ -350,13 +350,13 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-white/10 hover:bg-white/15 text-slate-300 rounded-full text-xs font-medium cursor-pointer transition-colors"
+              className="px-4 py-2 bg-white/10 hover:bg-white/15 text-slate-300 rounded-full text-xs font-medium cursor-pointer transition-colors apple-btn-active"
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-[#4285F4] hover:bg-[#3367d6] text-white font-semibold rounded-full text-xs shadow-md shadow-[#4285F4]/30 cursor-pointer transition-all active:scale-95"
+              className="px-6 py-2 bg-[#007AFF] hover:bg-[#0062cc] text-white font-semibold rounded-full text-xs shadow-md shadow-[#007AFF]/30 cursor-pointer transition-all apple-btn-active"
             >
               Créer la tâche
             </button>

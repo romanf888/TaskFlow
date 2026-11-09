@@ -35,6 +35,7 @@ import {
   BoardSortPreference 
 } from '../types/task';
 import { INITIAL_BOARDS, INITIAL_TASKS } from '../data/initialData';
+import { TaskFlowTemplate } from '../data/templatesData';
 
 interface TaskContextType {
   user: User | null;
@@ -84,6 +85,7 @@ interface TaskContextType {
   exportBoardToFile: (boardId: string) => void;
   importBoardFromFile: (file: File) => Promise<boolean>;
   saveCurrentDocument: () => void;
+  applyTemplate: (template: TaskFlowTemplate) => Promise<string>;
 
   // Task actions
   createTask: (task: Omit<Task, 'id' | 'boardId' | 'ownerId' | 'createdAt' | 'updatedAt'>) => Promise<string>;
@@ -128,6 +130,19 @@ function cleanFirestoreData<T extends Record<string, any>>(data: T): Record<stri
     }
   }
   return cleaned;
+}
+
+// Safely writes to localStorage, handling QuotaExceededError without throwing uncaught exceptions
+function safeLocalStorageSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error: any) {
+    if (error?.name === 'QuotaExceededError' || error?.code === 22 || error?.code === 1014) {
+      console.warn(`[TaskContext] LocalStorage quota exceeded for key "${key}". Data is preserved safely in app state & Firestore.`);
+    } else {
+      console.error(`[TaskContext] Failed to write to localStorage for key "${key}":`, error);
+    }
+  }
 }
 
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -181,7 +196,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_TEAMS_KEY, JSON.stringify(teamSessions));
+    safeLocalStorageSet(LOCAL_STORAGE_TEAMS_KEY, JSON.stringify(teamSessions));
   }, [teamSessions]);
 
   const [boardSortPreference, setBoardSortPreferenceState] = useState<BoardSortPreference>(() => {
@@ -193,12 +208,12 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_PROJECTS_KEY, JSON.stringify(projects));
+    safeLocalStorageSet(LOCAL_STORAGE_PROJECTS_KEY, JSON.stringify(projects));
   }, [projects]);
 
   const setBoardSortPreference = (pref: BoardSortPreference) => {
     setBoardSortPreferenceState(pref);
-    localStorage.setItem(LOCAL_STORAGE_BOARD_SORT_KEY, pref);
+    safeLocalStorageSet(LOCAL_STORAGE_BOARD_SORT_KEY, pref);
     if (user) {
       setDoc(doc(db, 'user_settings', user.uid), cleanFirestoreData({
         boardSortPreference: pref,
@@ -507,15 +522,15 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Save local state to localStorage
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(boards));
+    safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(boards));
   }, [boards]);
 
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(allTasks));
+    safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(allTasks));
   }, [allTasks]);
 
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_ACTIVE_BOARD_KEY, activeBoardId);
+    safeLocalStorageSet(LOCAL_STORAGE_ACTIVE_BOARD_KEY, activeBoardId);
   }, [activeBoardId]);
 
   // Initial connection test
@@ -955,8 +970,8 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const saveCurrentDocument = async () => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(boards));
-      localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(allTasks));
+      safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(boards));
+      safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(allTasks));
 
       if (user && activeBoard) {
         setSyncStatus('syncing');
@@ -980,6 +995,116 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Save error:', err);
       showNotification('Erreur lors de l’enregistrement.');
     }
+  };
+
+  // Apply or load a template
+  const applyTemplate = async (template: TaskFlowTemplate): Promise<string> => {
+    // 1. If it's the registered standard workspace
+    if (template.id === 'template-standard-workspace') {
+      const existingStandard = boards.find(b => b.id.startsWith('board-pro') || b.title === 'Sprints & Développement');
+      if (existingStandard) {
+        setActiveBoardIdState(existingStandard.id);
+        showNotification('Modèle Standard chargé : Accès à vos documents enregistrés');
+        return existingStandard.id;
+      }
+    }
+
+    // 2. Create the board(s) and tasks defined by the template
+    let primaryBoardId = '';
+    const newBoards: BoardDocument[] = [];
+    const newTasks: Task[] = [];
+    const ownerId = user ? user.uid : 'local-user';
+
+    for (let i = 0; i < template.boards.length; i++) {
+      const bDef = template.boards[i];
+      const newBId = `board_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      if (i === 0) primaryBoardId = newBId;
+
+      const newBoard: BoardDocument = {
+        id: newBId,
+        title: bDef.title,
+        description: bDef.description || '',
+        icon: bDef.icon || 'folder',
+        color: bDef.color || template.color,
+        ownerId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isCloud: !!user,
+        order: boards.length + i,
+        projectName: bDef.projectName || template.title,
+      };
+
+      newBoards.push(newBoard);
+
+      // Distribute tasks: prioritize exact boardIndex or matching originalBoardId
+      const matchingTasks = template.tasks.filter((tDef, tIdx) => {
+        if (tDef.boardIndex !== undefined) {
+          return tDef.boardIndex === i;
+        }
+        if (tDef.originalBoardId && bDef.originalBoardId) {
+          return tDef.originalBoardId === bDef.originalBoardId;
+        }
+        return template.boards.length === 1 || tIdx % template.boards.length === i;
+      });
+
+      for (const tDef of matchingTasks) {
+        const newTId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const newTask: Task = {
+          id: newTId,
+          boardId: newBId,
+          ownerId,
+          title: tDef.title,
+          description: tDef.description || '',
+          status: tDef.status,
+          priority: tDef.priority || 'medium',
+          category: tDef.category,
+          tags: tDef.tags || [],
+          subtasks: tDef.subtasks || [],
+          screenshotUrl: tDef.screenshotUrl,
+          order: tDef.order ?? 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        newTasks.push(newTask);
+      }
+    }
+
+    setBoards(prev => [...prev, ...newBoards]);
+    setAllTasks(prev => [...prev, ...newTasks]);
+
+    // Ensure all project names from the template are registered
+    const projectsToAdd = Array.from(new Set(template.boards.map(b => b.projectName).filter(Boolean))) as string[];
+    if (projectsToAdd.length > 0) {
+      setProjects(prev => {
+        const next = [...prev];
+        for (const p of projectsToAdd) {
+          if (!next.includes(p)) next.push(p);
+        }
+        return next;
+      });
+    }
+
+    if (primaryBoardId) {
+      setActiveBoardIdState(primaryBoardId);
+    }
+
+    if (user) {
+      try {
+        setSyncStatus('syncing');
+        for (const b of newBoards) {
+          await setDoc(doc(db, 'boards', b.id), cleanFirestoreData(b));
+        }
+        for (const t of newTasks) {
+          await setDoc(doc(db, 'tasks', t.id), cleanFirestoreData(t));
+        }
+        setSyncStatus('synced');
+      } catch (err) {
+        console.warn('Error syncing template to firestore:', err);
+      }
+    }
+
+    showNotification(`Modèle appliqué avec succès : "${template.title}"`);
+    return primaryBoardId || activeBoardId;
   };
 
   // Task Operations
@@ -1242,6 +1367,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         exportBoardToFile,
         importBoardFromFile,
         saveCurrentDocument,
+        applyTemplate,
         createTask,
         updateTask,
         deleteTask,

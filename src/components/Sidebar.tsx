@@ -44,7 +44,7 @@ interface SidebarProps {
   onOpenAuthModal: () => void;
   onOpenSettingsModal?: () => void;
   onOpenTeamModal?: (mode?: 'create' | 'join' | 'manage', code?: string) => void;
-  onOpenLandingPage?: () => void;
+  onOpenHomeScreen?: () => void;
   isOpen: boolean;
   onToggle: () => void;
 }
@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAuthModal,
   onOpenSettingsModal,
   onOpenTeamModal,
-  onOpenLandingPage,
+  onOpenHomeScreen,
   isOpen,
   onToggle,
 }) => {
@@ -84,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     syncStatus,
   } = useTaskContext();
 
-  const { preferences, effectiveTheme } = useSettings();
+  const { preferences, effectiveTheme, isLiquidGlass } = useSettings();
   const isLight = effectiveTheme === 'light';
 
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
@@ -676,48 +676,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className="hidden"
       />
 
-      {/* Google Navigation Drawer */}
+      {/* Navigation Drawer */}
       <aside
         className={`${
           isOpen ? 'w-76' : 'w-0 -translate-x-full lg:w-0'
         } transition-all duration-300 ease-in-out ${
-          isLight 
-            ? 'bg-[#f1f3f4] border-r border-slate-300 text-slate-800' 
-            : 'bg-[#1e1f20] border-r border-white/10 text-slate-200'
+          isLiquidGlass
+            ? 'bg-[#060913]/70 border-r border-white/15 text-slate-100 backdrop-blur-3xl shadow-2xl'
+            : isLight 
+            ? 'bg-white/90 border-r border-black/10 text-slate-800 backdrop-blur-2xl' 
+            : 'bg-[#1c1c1e]/90 border-r border-white/10 text-slate-200 backdrop-blur-2xl'
         } flex flex-col shrink-0 overflow-hidden select-none z-30 shadow-xl relative`}
       >
         {/* Brand Header */}
         <div className={`p-4 border-b flex items-center justify-between ${
-          isLight ? 'bg-white border-slate-200' : 'bg-[#191a1b] border-white/10'
+          isLiquidGlass ? 'bg-white/5 border-white/10' : isLight ? 'bg-white/50 border-black/10' : 'bg-black/30 border-white/10'
         }`}>
           <TaskFlowLogo size={30} showText={true} />
         </div>
 
-        {/* Actions: + Nouveau Document & Site/Wiki */}
+        {/* Actions: + Nouveau Document & Accueil/Modèles */}
         <div className="p-3 space-y-2">
           <button
             onClick={onOpenNewDocModal}
-            className={`w-full py-2.5 px-4 rounded-full border shadow-xs flex items-center justify-center space-x-2 text-xs font-semibold transition-all cursor-pointer group ${
-              isLight
-                ? 'bg-white hover:bg-slate-50 text-[#1967d2] border-[#4285F4]/30'
-                : 'bg-[#282a2d] hover:bg-[#323639] text-[#8ab4f8] hover:text-white border-[#4285F4]/30'
-            }`}
+            className="w-full py-2.5 px-4 rounded-full bg-[#007AFF] hover:bg-[#0062cc] text-white shadow-md shadow-[#007AFF]/25 flex items-center justify-center space-x-2 text-xs font-semibold apple-btn-active transition-all cursor-pointer group"
           >
-            <Plus className="w-4 h-4 text-[#4285F4] group-hover:scale-110 transition-transform" />
+            <Plus className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
             <span>Nouveau document</span>
           </button>
 
-          {onOpenLandingPage && (
+          {onOpenHomeScreen && (
             <button
-              onClick={onOpenLandingPage}
-              className={`w-full py-2 px-4 rounded-full border flex items-center justify-center space-x-2 text-xs font-semibold transition-all cursor-pointer ${
+              onClick={onOpenHomeScreen}
+              className={`w-full py-2 px-4 rounded-full border flex items-center justify-center space-x-2 text-xs font-semibold apple-btn-active transition-all cursor-pointer ${
                 isLight
-                  ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
-                  : 'bg-white/10 hover:bg-white/20 border-white/15 text-white'
+                  ? 'bg-black/5 hover:bg-black/10 border-black/10 text-slate-800'
+                  : 'bg-white/10 hover:bg-white/15 border-white/15 text-white'
               }`}
             >
-              <Globe className="w-3.5 h-3.5 text-[#4285F4]" />
-              <span>Site de Présentation & Wiki</span>
+              <Home className="w-3.5 h-3.5 text-[#007AFF]" />
+              <span>Accueil & Modèles</span>
             </button>
           )}
         </div>

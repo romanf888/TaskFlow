@@ -121,33 +121,33 @@ export const STATUS_COLUMNS: {
     id: 'todo',
     label: 'À faire',
     description: 'Tâches à accomplir',
-    accentColor: '#FBBC04', // Google Yellow
-    headerGradient: 'from-[#FBBC04]/20 via-[#FBBC04]/5 to-transparent',
-    columnBg: 'bg-[#1e1f20]/95',
-    borderActive: 'border-[#FBBC04]/70 shadow-[#FBBC04]/20 ring-2 ring-[#FBBC04]/30',
-    badgeClass: 'bg-[#FBBC04] text-slate-950 font-bold shadow-sm',
-    pillColor: 'text-[#FBBC04]',
+    accentColor: '#FF9500', // Apple System Orange
+    headerGradient: 'from-[#FF9500]/15 via-[#FF9500]/5 to-transparent',
+    columnBg: 'bg-[#1c1c1e]/90',
+    borderActive: 'border-[#FF9500]/70 shadow-[#FF9500]/20 ring-2 ring-[#FF9500]/30',
+    badgeClass: 'bg-[#FF9500] text-black font-semibold shadow-xs',
+    pillColor: 'text-[#FF9500]',
   },
   {
     id: 'in_progress',
     label: 'En cours',
     description: 'Tâches en cours d’exécution',
-    accentColor: '#4285F4', // Google Blue
-    headerGradient: 'from-[#4285F4]/20 via-[#4285F4]/5 to-transparent',
-    columnBg: 'bg-[#1e1f20]/95',
-    borderActive: 'border-[#4285F4]/70 shadow-[#4285F4]/20 ring-2 ring-[#4285F4]/30',
-    badgeClass: 'bg-[#4285F4] text-white font-bold shadow-sm',
-    pillColor: 'text-[#4285F4]',
+    accentColor: '#007AFF', // Apple System Blue
+    headerGradient: 'from-[#007AFF]/15 via-[#007AFF]/5 to-transparent',
+    columnBg: 'bg-[#1c1c1e]/90',
+    borderActive: 'border-[#007AFF]/70 shadow-[#007AFF]/20 ring-2 ring-[#007AFF]/30',
+    badgeClass: 'bg-[#007AFF] text-white font-semibold shadow-xs',
+    pillColor: 'text-[#007AFF]',
   },
   {
     id: 'done',
     label: 'Fait',
     description: 'Tâches terminées avec succès',
-    accentColor: '#34A853', // Google Green
-    headerGradient: 'from-[#34A853]/20 via-[#34A853]/5 to-transparent',
-    columnBg: 'bg-[#1e1f20]/95',
-    borderActive: 'border-[#34A853]/70 shadow-[#34A853]/20 ring-2 ring-[#34A853]/30',
-    badgeClass: 'bg-[#34A853] text-white font-bold shadow-sm',
-    pillColor: 'text-[#34A853]',
+    accentColor: '#34C759', // Apple System Green
+    headerGradient: 'from-[#34C759]/15 via-[#34C759]/5 to-transparent',
+    columnBg: 'bg-[#1c1c1e]/90',
+    borderActive: 'border-[#34C759]/70 shadow-[#34C759]/20 ring-2 ring-[#34C759]/30',
+    badgeClass: 'bg-[#34C759] text-white font-semibold shadow-xs',
+    pillColor: 'text-[#34C759]',
   },
 ];

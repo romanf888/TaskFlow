@@ -129,8 +129,8 @@ function setupAutoUpdater() {
     const { autoUpdater } = require('electron-updater');
     if (!autoUpdater) return;
 
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoDownload = false; // Do not download automatically: ask the user via popup
+    autoUpdater.autoInstallOnAppQuit = false; // Do not install automatically on quit without user consent
 
     autoUpdater.on('checking-for-update', () => {
       mainWindow?.webContents.send('updater-status', { status: 'checking' });
@@ -140,7 +140,8 @@ function setupAutoUpdater() {
       mainWindow?.webContents.send('updater-status', { 
         status: 'available', 
         version: info?.version,
-        releaseDate: info?.releaseDate 
+        releaseDate: info?.releaseDate,
+        releaseNotes: info?.releaseNotes
       });
     });
 
@@ -175,10 +176,10 @@ function setupAutoUpdater() {
       });
     });
 
-    // Check once at startup if packaged
+    // Check once at startup if packaged without auto-downloading
     if (app.isPackaged) {
       setTimeout(() => {
-        autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+        autoUpdater.checkForUpdates().catch(() => {});
       }, 3000);
     }
   } catch (err) {
@@ -308,6 +309,21 @@ ipcMain.handle('check-for-updates', async () => {
   } catch (err) {
     mainWindow?.webContents.send('updater-status', { status: 'error', error: err.message });
     return { status: 'error', error: err.message };
+  }
+});
+
+ipcMain.handle('start-download-update', async () => {
+  try {
+    const { autoUpdater } = require('electron-updater');
+    if (!autoUpdater) return { success: false, error: 'Module non disponible' };
+    
+    mainWindow?.webContents.send('updater-status', { status: 'downloading', percent: 0 });
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to download update:', err);
+    mainWindow?.webContents.send('updater-status', { status: 'error', error: err.message });
+    return { success: false, error: err.message };
   }
 });
 

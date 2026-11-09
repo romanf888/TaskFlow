@@ -23,7 +23,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDragStart 
 }) => {
   const { moveTaskStatus, categories } = useTaskContext();
-  const { preferences, effectiveTheme, getRoundedClass } = useSettings();
+  const { preferences, effectiveTheme, getRoundedClass, isLiquidGlass } = useSettings();
   const isLight = effectiveTheme === 'light';
 
   const totalSubtasks = task.subtasks?.length || 0;
@@ -37,36 +37,36 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     ? 'bg-blue-100 text-blue-700 border-blue-200'
     : 'bg-[#4285F4]/20 text-[#8ab4f8] border-[#4285F4]/30';
 
-  // Google Priority Dot & Label
+  // Apple Human Interface Guidelines Priority Dot & Label
   const getPriorityInfo = (priority?: string) => {
     switch (priority) {
       case 'urgent':
         return {
-          dot: '#EA4335', // Google Red
+          dot: '#FF3B30', // Apple System Red
           label: 'Urgente',
-          pillClass: isLight ? 'bg-red-50 text-red-700 border-red-200' : 'bg-[#EA4335]/20 text-[#f28b82] border-[#EA4335]/40',
+          pillClass: isLight ? 'bg-red-50 text-[#FF3B30] border-red-200' : 'bg-[#FF3B30]/20 text-[#FF453A] border-[#FF3B30]/40',
         };
       case 'high':
         return {
-          dot: '#FBBC04', // Google Yellow
+          dot: '#FF9500', // Apple System Orange
           label: 'Haute',
-          pillClass: isLight ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-[#FBBC04]/20 text-[#fdd663] border-[#FBBC04]/40',
+          pillClass: isLight ? 'bg-amber-50 text-[#FF9500] border-amber-200' : 'bg-[#FF9500]/20 text-[#FF9F0A] border-[#FF9500]/40',
         };
       case 'medium':
         return {
-          dot: '#4285F4', // Google Blue
+          dot: '#007AFF', // Apple System Blue
           label: 'Moyenne',
-          pillClass: isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-[#4285F4]/20 text-[#8ab4f8] border-[#4285F4]/40',
+          pillClass: isLight ? 'bg-blue-50 text-[#007AFF] border-blue-200' : 'bg-[#007AFF]/20 text-[#0A84FF] border-[#007AFF]/40',
         };
       case 'low':
         return {
-          dot: '#34A853', // Google Green
+          dot: '#34C759', // Apple System Green
           label: 'Basse',
-          pillClass: isLight ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-[#34A853]/20 text-[#81c995] border-[#34A853]/40',
+          pillClass: isLight ? 'bg-emerald-50 text-[#34C759] border-emerald-200' : 'bg-[#34C759]/20 text-[#30D158] border-[#34C759]/40',
         };
       default:
         return {
-          dot: '#9aa0a6',
+          dot: '#8E8E93', // Apple System Gray
           label: 'Normale',
           pillClass: isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-white/10 text-slate-300 border-white/20',
         };
@@ -75,7 +75,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   const priority = getPriorityInfo(task.priority);
 
-  // Quick 1-click completion toggle (Google Tasks style)
+  // Quick 1-click completion toggle
   const handleQuickToggleDone = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (task.status === 'done') {
@@ -92,12 +92,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       draggable
       onDragStart={(e) => onDragStart(e, task)}
       onClick={() => onOpenDetails(task)}
-      title="Cliquez pour afficher et modifier les détails complets de la tâche"
-      className={`group relative border ${cardRounded} px-3 py-2.5 transition-all duration-150 cursor-pointer select-none active:scale-[0.99] ${
-        isLight
-          ? 'bg-white hover:bg-slate-50 border-slate-200 hover:border-[#4285F4]/50 shadow-xs hover:shadow-md text-slate-800'
-          : 'bg-[#282a2d] hover:bg-[#323639] border-white/10 hover:border-white/25 shadow-sm hover:shadow-lg text-slate-100'
-      } ${task.status === 'done' ? 'opacity-65' : ''}`}
+      title="Afficher et modifier les détails de la tâche"
+      className={`group relative border ${cardRounded} px-3.5 py-2.5 transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
+        isLiquidGlass
+          ? 'apple-liquid-card border-white/15 hover:border-cyan-400/40 text-slate-100'
+          : isLight
+          ? 'bg-white hover:bg-slate-50 border-black/5 hover:border-black/15 shadow-xs hover:shadow-md text-slate-900'
+          : 'bg-[#2c2c2e]/90 hover:bg-[#3a3a3c] border-white/10 hover:border-white/20 shadow-sm hover:shadow-lg text-slate-100'
+      } ${task.status === 'done' ? 'opacity-60' : ''}`}
     >
       {/* Compact Main Row */}
       <div className="flex items-center space-x-2.5">
