@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidBoard(data) {
+      return data.keys().hasAll(['title', 'ownerId']) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+        data.ownerId is string &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('isCloud' in data) || data.isCloud is bool) &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+        (!('icon' in data) || (data.icon is string && data.icon.size() <= 50)) &&
+        (!('color' in data) || (data.color is string && data.color.size() <= 20)) &&
+        (!('projectName' in data) || (data.projectName is string && data.projectName.size() <= 100)) &&
+        (!('teamSessionCode' in data) || (data.teamSessionCode is string && data.teamSessionCode.size() <= 50));
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['title', 'status', 'boardId', 'ownerId']) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 150 &&
+        data.status in ['todo', 'in_progress', 'done'] &&
+        data.boardId is string && data.boardId.size() <= 128 &&
+        data.ownerId is string &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 3000)) &&
+        (!('priority' in data) || data.priority in ['low', 'medium', 'high', 'urgent']) &&
+        (!('category' in data) || (data.category is string && data.category.size() <= 50)) &&
+        (!('tags' in data) || (data.tags is list && data.tags.size() <= 15)) &&
+        (!('subtasks' in data) || (data.subtasks is list && data.subtasks.size() <= 50)) &&
+        (!('screenshotUrl' in data) || (data.screenshotUrl is string && data.screenshotUrl.size() <= 1000000)) &&
+        (!('order' in data) || data.order is number);
+    }
+
+    // Boards collection
+    match /boards/{boardId} {
+      allow get, list, create, update, delete: if isSignedIn();
+
+      // Tasks subcollection under a board
+      match /tasks/{taskId} {
+        allow get, list, create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Team Sessions collection
+    match /team_sessions/{code} {
+      allow read, write: if isSignedIn();
+      match /{allSubcollections=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // User Settings & Projects collection
+    match /user_settings/{userId} {
+      allow get, list, create, update, delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Unified User Documents collection (Single document per workspace to save Firestore document count)
+    match /user_documents/{docId} {
+      allow get, list, create, update, delete: if isSignedIn();
+    }
+  }
+}
