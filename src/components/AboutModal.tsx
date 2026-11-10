@@ -36,29 +36,49 @@ export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
               <div className="flex items-center space-x-2">
                 <h4 className="font-bold text-white text-sm">TaskFlow</h4>
                 <span className="px-2 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF] border border-[#007AFF]/40 text-[10px] font-mono font-bold">
-                  v1.5.0
+                  v1.5.2
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 text-[10px] font-medium">
-                  Windows Native & Presets Edition
+                  Light Theme & Cloud Storage Edition
                 </span>
               </div>
               <p className="text-slate-400 text-xs mt-0.5">
-                Gestionnaire de tâches avec page d'accueil Word-style, barre de titre native Windows (réduire, agrandir, fermer), Gros Document Unifié multi-catégories et thème Liquid Glass iOS 27.
+                Gestionnaire de tâches avec page d'accueil moderne, jauge de stockage Cloud Google Drive, animations fluides et synchronisation temps réel.
               </p>
             </div>
           </div>
 
           {/* Points forts */}
           <div className="space-y-2">
-            <h5 className="font-semibold text-slate-200">Nouveautés & fonctionnalités v1.5.0 :</h5>
+            <h5 className="font-semibold text-slate-200">Nouveautés & correctifs v1.5.2 :</h5>
             <div className="space-y-2 text-slate-300 bg-[#282a2d]/60 p-3.5 rounded-2xl border border-white/5">
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#007AFF] shrink-0 mt-0.5" />
+                <span><strong>Jauge de stockage Cloud style Google Drive :</strong> Indicateur épuré avec icône nuage, barre de progression et calcul exact de l'espace utilisé sur 1 Go.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span><strong>Mode Clair optimisé :</strong> Arrière-plan doux, cartes en blanc éclatant avec bordures fines en ardoise et contrastes améliorés.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <span><strong>Animations & Micro-interactions :</strong> Élévation subtile des cartes au survol (hover lift), transitions d'onglets fluides et animations de fenêtres.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <span><strong>Compresseur d'images automatique :</strong> Optimisation instantanée des captures d'écran et illustrations collées.</span>
+              </div>
+              <div className="flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <span><strong>Synchronisation instantanée multi-appareils :</strong> Prise en compte immédiate des titres de document, catégories et tableaux dans Firestore.</span>
+              </div>
               <div className="flex items-start space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <span><strong>Contrôles de fenêtre Windows sur la page d'accueil :</strong> Boutons natifs pour réduire, agrandir/restaurer et fermer l'application, avec barre de titre déplaçable.</span>
               </div>
               <div className="flex items-start space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-[#007AFF] shrink-0 mt-0.5" />
-                <span><strong>Gros Document Unifié :</strong> Regroupement de toutes vos catégories (Développements, Scolaire, Personnel) et sous-projets au sein d'un document maître unique.</span>
+                <span><strong>Document multi-catégories :</strong> Créez et organisez librement toutes vos catégories (Développements, Scolaire, Personnel...) et sous-projets au sein de votre document.</span>
               </div>
               <div className="flex items-start space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />

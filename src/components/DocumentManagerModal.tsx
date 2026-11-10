@@ -186,13 +186,13 @@ export const DocumentManagerModal: React.FC<DocumentManagerModalProps> = ({ onCl
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Rattacher à un projet (Optionnel)</label>
+                <label className="block text-slate-400 mb-1">Catégorie dans le document (Optionnel)</label>
                 <select
                   value={newProject}
                   onChange={(e) => setNewProject(e.target.value)}
                   className="w-full bg-[#242b3e] border border-white/15 rounded-md px-3 py-1.5 text-slate-100 text-xs focus:outline-none"
                 >
-                  <option value="">-- Aucun projet (Document autonome) --</option>
+                  <option value="">-- Aucune catégorie (Racine du document) --</option>
                   {projects.map((p) => (
                     <option key={p} value={p}>{p}</option>
                   ))}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Plus, CheckCircle2, Clock, ListTodo, Sparkles } from 'lucide-react';
 import { Task, TaskStatus, STATUS_COLUMNS } from '../types/task';
 import { useTaskContext } from '../context/TaskContext';
@@ -19,11 +19,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const isLight = effectiveTheme === 'light';
 
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const activeDragTaskIdRef = useRef<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
   const [mobileActiveColumn, setMobileActiveColumn] = useState<TaskStatus | 'all'>('all');
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, task: Task) => {
     setDraggedTaskId(task.id);
+    activeDragTaskIdRef.current = task.id;
     e.dataTransfer.setData('text/plain', task.id);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -46,11 +48,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, status: TaskStatus) => {
     e.preventDefault();
     setDragOverColumn(null);
-    const taskId = e.dataTransfer.getData('text/plain') || draggedTaskId;
+    const textData = e.dataTransfer.getData('text/plain');
+    const taskId = textData || draggedTaskId || activeDragTaskIdRef.current;
     if (taskId) {
       moveTaskStatus(taskId, status);
     }
     setDraggedTaskId(null);
+    activeDragTaskIdRef.current = null;
   };
 
   const getColumnIcon = (id: TaskStatus) => {

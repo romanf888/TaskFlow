@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { WindowsWindowControls } from './WindowsWindowControls';
 import { 
   Menu, 
   Plus, 
@@ -114,7 +115,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         isLiquidGlass
           ? 'bg-[#090e1d]/60 border-white/20 text-slate-100 shadow-xl shadow-cyan-950/20'
           : isLight 
-          ? 'bg-white/80 border-black/10 text-slate-900 shadow-sm' 
+          ? 'bg-white/95 border-slate-200 text-slate-900 shadow-xs' 
           : 'bg-[#1c1c1e]/80 border-white/10 text-slate-100 shadow-lg shadow-black/40'
       }`}
     >
@@ -414,35 +415,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </button>
 
         {/* Electron Window Actions (Frameless Native Window Controls) */}
-        {isElectron && (
-          <div className="flex items-center ml-2 pl-2 border-l border-black/10 dark:border-white/15 h-8">
-            <button
-              onClick={handleMinimize}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
-                isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'
-              }`}
-              title="Réduire"
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={handleMaximize}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
-                isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'
-              }`}
-              title={isMaximized ? "Restaurer" : "Agrandir"}
-            >
-              {isMaximized ? <Maximize2 className="w-3.5 h-3.5" /> : <Square className="w-3 h-3" />}
-            </button>
-            <button
-              onClick={handleClose}
-              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#EA4335] rounded-lg transition-colors cursor-pointer"
-              title="Fermer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        <WindowsWindowControls />
       </div>
     </header>
   );

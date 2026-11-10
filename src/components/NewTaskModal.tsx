@@ -14,6 +14,7 @@ import {
 import { TaskStatus, TaskPriority, Subtask } from '../types/task';
 import { useTaskContext } from '../context/TaskContext';
 import { createSampleIllustration } from '../utils/sampleIllustrations';
+import { compressImageDataUrl } from '../utils/imageCompressor';
 
 interface NewTaskModalProps {
   initialStatus: TaskStatus;
@@ -71,9 +72,12 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (loadEvent) => {
+      reader.onload = async (loadEvent) => {
         const base64 = loadEvent.target?.result as string;
-        if (base64) setScreenshotUrl(base64);
+        if (base64) {
+          const compressed = await compressImageDataUrl(base64);
+          setScreenshotUrl(compressed);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -112,7 +116,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
       onClick={onClose}
     >
       <div 
-        className="w-full max-w-xl bg-[#1e1f20] border border-white/15 rounded-3xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh]"
+        className="w-full max-w-xl bg-[#1e1f20] border border-white/15 rounded-3xl shadow-2xl overflow-hidden text-slate-200 my-auto flex flex-col max-h-[90vh] animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
         <input 

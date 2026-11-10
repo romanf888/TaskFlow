@@ -20,6 +20,7 @@ import {
 import { Task, TaskStatus, TaskPriority, STATUS_COLUMNS, Subtask } from '../types/task';
 import { useTaskContext } from '../context/TaskContext';
 import { createSampleIllustration } from '../utils/sampleIllustrations';
+import { compressImageDataUrl } from '../utils/imageCompressor';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -79,12 +80,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           const file = items[i].getAsFile();
           if (file) {
             const reader = new FileReader();
-            reader.onload = (loadEvent) => {
+            reader.onload = async (loadEvent) => {
               const base64 = loadEvent.target?.result as string;
               if (base64) {
-                setEditedScreenshotUrl(base64);
+                const compressed = await compressImageDataUrl(base64);
+                setEditedScreenshotUrl(compressed);
                 if (task && !isEditing) {
-                  updateTask(task.id, { screenshotUrl: base64 });
+                  updateTask(task.id, { screenshotUrl: compressed });
                 }
               }
             };
@@ -174,12 +176,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (loadEvent) => {
+      reader.onload = async (loadEvent) => {
         const base64 = loadEvent.target?.result as string;
         if (base64) {
-          setEditedScreenshotUrl(base64);
+          const compressed = await compressImageDataUrl(base64);
+          setEditedScreenshotUrl(compressed);
           if (!isEditing) {
-            updateTask(task.id, { screenshotUrl: base64 });
+            updateTask(task.id, { screenshotUrl: compressed });
           }
         }
       };

@@ -74,5 +74,10 @@ service cloud.firestore {
     match /user_settings/{userId} {
       allow get, list, create, update, delete: if isSignedIn() && request.auth.uid == userId;
     }
+
+    // Unified User Documents collection (Single document per workspace to save Firestore document count)
+    match /user_documents/{docId} {
+      allow get, list, create, update, delete: if isSignedIn();
+    }
   }
 }

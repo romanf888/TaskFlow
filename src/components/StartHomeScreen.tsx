@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { WindowsWindowControls } from './WindowsWindowControls';
 import { 
   Plus, 
   Layers, 
@@ -27,6 +28,7 @@ import {
   X,
   FolderPlus,
   Cloud,
+  Database,
   Check,
   Tag,
   Sun,
@@ -63,8 +65,15 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
     applyTemplate,
     deleteBoard,
     exportBoardToFile,
+    exportDocumentToFile,
     importBoardFromFile,
+    saveCurrentDocument,
     createBoard,
+    createProject,
+    deleteProject,
+    masterDocTitle,
+    setMasterDocTitle,
+    createNewDocument,
     syncStatus
   } = useTaskContext();
 
@@ -75,21 +84,6 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
   const [activeNav, setActiveNav] = useState<'home' | 'templates' | 'open'>('home');
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState<string>('all');
   const [searchDocQuery, setSearchDocQuery] = useState('');
-
-  // Recent documents view mode: 'categories' (Gros Documents / Presets) vs 'boards' (Documents individuels)
-  const [recentViewMode, setRecentViewMode] = useState<'categories' | 'boards'>(() => {
-    try {
-      return (localStorage.getItem('taskflow_start_view_mode') as 'categories' | 'boards') || 'categories';
-    } catch {}
-    return 'categories';
-  });
-
-  const handleSetRecentViewMode = (mode: 'categories' | 'boards') => {
-    setRecentViewMode(mode);
-    try {
-      localStorage.setItem('taskflow_start_view_mode', mode);
-    } catch {}
-  };
 
   // Electron Window Controls (Minimize, Maximize / Restore, Close)
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
@@ -129,33 +123,75 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
     }
   };
 
-  // State for Saving Category / Workspace as a Preset (Gros Document)
+  // State for Saving Category / Workspace as a Model / Preset
   const [isSavingCategoryPresetModalOpen, setIsSavingCategoryPresetModalOpen] = useState(false);
   const [targetCategoryForPreset, setTargetCategoryForPreset] = useState<string>('__ALL__');
   const [presetTitle, setPresetTitle] = useState('');
   const [presetDescription, setPresetDescription] = useState('');
-  const [presetBadge, setPresetBadge] = useState('Gros Document Unifié');
+  const [presetBadge, setPresetBadge] = useState('Document Standard');
   const [presetColor, setPresetColor] = useState('#007AFF');
   const [presetToastMessage, setPresetToastMessage] = useState<string | null>(null);
 
-  // Master Document title (unified multi-category document)
-  const [masterDocTitle, setMasterDocTitle] = useState(() => {
-    try {
-      return localStorage.getItem('taskflow_master_doc_title') || 'Document Principal TaskFlow';
-    } catch {}
-    return 'Document Principal TaskFlow';
-  });
+  // Inline category creation inside Document
+  const [isAddingCategoryInline, setIsAddingCategoryInline] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Inline project creation inside a specific category
+  const [addingBoardForCategory, setAddingBoardForCategory] = useState<string | null>(null);
+  const [newBoardTitleForCategory, setNewBoardTitleForCategory] = useState('');
+
+  const handleCreateCategoryInline = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    createProject(newCategoryName.trim());
+    setPresetToastMessage(`Catégorie "${newCategoryName.trim()}" créée avec succès dans votre document !`);
+    setTimeout(() => setPresetToastMessage(null), 4000);
+    setNewCategoryName('');
+    setIsAddingCategoryInline(false);
+  };
+
+  const handleCreateBoardForCategory = async (catName: string) => {
+    if (!newBoardTitleForCategory.trim()) return;
+    await createBoard(newBoardTitleForCategory.trim(), '', 'folder', '#007AFF', catName);
+    setPresetToastMessage(`Projet "${newBoardTitleForCategory.trim()}" ajouté dans "${catName}" !`);
+    setTimeout(() => setPresetToastMessage(null), 4000);
+    setNewBoardTitleForCategory('');
+    setAddingBoardForCategory(null);
+  };
+
+  // Master Document title editing
   const [isEditingMasterDocTitle, setIsEditingMasterDocTitle] = useState(false);
   const [tempMasterDocTitle, setTempMasterDocTitle] = useState(masterDocTitle);
+
+  useEffect(() => {
+    setTempMasterDocTitle(masterDocTitle);
+  }, [masterDocTitle]);
 
   const handleSaveMasterDocTitle = () => {
     if (!tempMasterDocTitle.trim()) return;
     setMasterDocTitle(tempMasterDocTitle.trim());
-    try {
-      localStorage.setItem('taskflow_master_doc_title', tempMasterDocTitle.trim());
-    } catch {}
     setIsEditingMasterDocTitle(false);
   };
+
+  // Real-time calculation of Firebase Cloud Storage payload size
+  const docSizeBytes = useMemo(() => {
+    try {
+      const payload = JSON.stringify({
+        title: masterDocTitle,
+        categories: projects,
+        boards,
+        tasks: allTasks,
+      });
+      return new Blob([payload]).size;
+    } catch (e) {
+      return 0;
+    }
+  }, [masterDocTitle, projects, boards, allTasks]);
+
+  const docSizeMb = (docSizeBytes / (1024 * 1024)).toFixed(3);
+  
+  // Project quota (1 GB = 1,000 MB)
+  const projectQuotaPercent = (docSizeBytes / (1000 * 1024 * 1024)) * 100;
   
   // Custom template creation modal state
   const [isCreatingCustomTemplate, setIsCreatingCustomTemplate] = useState(false);
@@ -194,7 +230,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
     );
   }, [boards, searchDocQuery]);
 
-  // Unique categories / Gros Documents groups
+  // Unique categories groups in Document
   const categoryGroups = useMemo(() => {
     const allCatNames = Array.from(new Set([
       ...projects,
@@ -226,8 +262,13 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
         hasActive,
         matchesSearch
       };
-    }).filter(group => group.boards.length > 0 && group.matchesSearch);
+    }).filter(group => (group.boards.length > 0 || projects.includes(group.categoryName)) && group.matchesSearch);
   }, [boards, projects, allTasks, activeBoardId, searchDocQuery]);
+
+  const documentTasks = useMemo(() => {
+    const validBoardIds = new Set(boards.map(b => b.id));
+    return allTasks.filter(t => validBoardIds.has(t.boardId));
+  }, [boards, allTasks]);
 
   const activeBoard = useMemo(() => {
     return boards.find(b => b.id === activeBoardId) || boards[0];
@@ -288,103 +329,9 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
     onOpenWorkspace();
   };
 
-  const openSaveCategoryPresetModal = (catName: string = '__ALL__') => {
-    setTargetCategoryForPreset(catName);
-    
-    const categoryNamesList = categoryGroups.map(g => g.categoryName).join(', ');
-    if (catName === '__ALL__') {
-      setPresetTitle(`Preset ${masterDocTitle}`);
-      setPresetDescription(`Gros Document unifié regroupant toutes vos catégories (${categoryNamesList}), ${boards.length} projets et ${allTasks.length} tâches.`);
-    } else {
-      const catBoards = boards.filter(b => (b.projectName || 'Non classé') === catName);
-      const catTasks = allTasks.filter(t => catBoards.some(b => b.id === t.boardId));
-      setPresetTitle(`Preset ${catName}`);
-      setPresetDescription(`Gros Document contenant ${catBoards.length} projet${catBoards.length > 1 ? 's' : ''} (${catBoards.map(b => b.title).join(', ')}) et ${catTasks.length} tâches.`);
-    }
-    setPresetBadge('Gros Document Unifié');
-    setPresetColor('#007AFF');
-    setIsSavingCategoryPresetModalOpen(true);
-  };
-
-  const handleTargetCategoryChange = (newCat: string) => {
-    setTargetCategoryForPreset(newCat);
-    const categoryNamesList = categoryGroups.map(g => g.categoryName).join(', ');
-    if (newCat === '__ALL__') {
-      setPresetTitle(`Preset ${masterDocTitle}`);
-      setPresetDescription(`Gros Document unifié regroupant toutes vos catégories (${categoryNamesList}), ${boards.length} projets et ${allTasks.length} tâches.`);
-    } else {
-      const catBoards = boards.filter(b => (b.projectName || 'Non classé') === newCat);
-      const catTasks = allTasks.filter(t => catBoards.some(b => b.id === t.boardId));
-      setPresetTitle(`Preset ${newCat}`);
-      setPresetDescription(`Gros Document contenant ${catBoards.length} projet${catBoards.length > 1 ? 's' : ''} (${catBoards.map(b => b.title).join(', ')}) et ${catTasks.length} tâches.`);
-    }
-  };
-
-  const handleConfirmSavePreset = () => {
-    if (!presetTitle.trim()) return;
-
-    const catBoards = targetCategoryForPreset === '__ALL__'
-      ? boards
-      : boards.filter(b => (b.projectName || 'Non classé') === targetCategoryForPreset);
-
-    if (catBoards.length === 0) return;
-
-    const catTasks = allTasks.filter(t => catBoards.some(b => b.id === t.boardId));
-
-    const newPresetTemplate: TaskFlowTemplate = {
-      id: `preset-group-${Date.now()}`,
-      title: presetTitle.trim(),
-      subtitle: `Gros Document (${catBoards.length} projet${catBoards.length > 1 ? 's' : ''}, ${catTasks.length} tâches)`,
-      category: 'preset',
-      badge: presetBadge.trim() || 'Gros Document',
-      description: presetDescription.trim() || `Preset multi-projets basé sur la catégorie ${targetCategoryForPreset}.`,
-      icon: 'layers',
-      color: presetColor,
-      isCustom: true,
-      isPresetGroup: true,
-      categoryName: targetCategoryForPreset === '__ALL__' ? 'Espace Complet' : targetCategoryForPreset,
-      createdAt: new Date().toISOString(),
-      boards: catBoards.map((b, idx) => ({
-        title: b.title,
-        description: b.description || '',
-        icon: b.icon || 'folder',
-        color: b.color || presetColor,
-        projectName: b.projectName || presetTitle,
-        order: idx,
-        originalBoardId: b.id,
-      })),
-      tasks: catTasks.map(t => {
-        const bIdx = catBoards.findIndex(b => b.id === t.boardId);
-        return {
-          title: t.title,
-          description: t.description || '',
-          status: t.status,
-          priority: t.priority,
-          category: t.category,
-          tags: t.tags,
-          subtasks: t.subtasks,
-          screenshotUrl: t.screenshotUrl,
-          order: t.order,
-          boardIndex: bIdx >= 0 ? bIdx : 0,
-          originalBoardId: t.boardId,
-        };
-      }),
-    };
-
-    const updated = [newPresetTemplate, ...customTemplates];
-    setCustomTemplates(updated);
-    try {
-      localStorage.setItem('taskflow_custom_user_templates_v1', JSON.stringify(updated));
-    } catch {}
-
-    setIsSavingCategoryPresetModalOpen(false);
-    setPresetToastMessage(`Le Gros Document "${newPresetTemplate.title}" a été enregistré comme Preset !`);
-    setTimeout(() => setPresetToastMessage(null), 5000);
-  };
-
   const handleDeleteCustomTemplate = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("Supprimer ce preset / modèle enregistré ?")) {
+    if (confirm("Supprimer ce modèle ?")) {
       const updated = customTemplates.filter(t => t.id !== id);
       setCustomTemplates(updated);
       try {
@@ -428,61 +375,34 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
         ? 'bg-[#f4f5f7] text-slate-800' 
         : 'bg-[#121316] text-[#e3e3e3]'
     }`}>
-      {/* Windows 11 Native Titlebar with Drag & Window Controls (Réduire, Agrandir, Fermer) */}
-      <div 
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        onDoubleClick={handleMaximize}
-        className={`h-9 w-full flex items-center justify-between px-3 border-b select-none shrink-0 z-50 backdrop-blur-md transition-colors ${
-          isLiquidGlass
-            ? 'bg-[#090d1c]/80 border-white/10 text-slate-300'
-            : isLight
-            ? 'bg-slate-100/90 border-slate-200 text-slate-700'
-            : 'bg-[#18191c]/95 border-white/10 text-slate-300'
-        }`}
-      >
-        <div className="flex items-center space-x-2 text-xs font-semibold pointer-events-none">
-          <TaskFlowLogo size={18} showText={false} />
-          <span className="text-[11px] font-medium tracking-tight">TaskFlow Windows</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF] font-mono font-bold">
-            v1.5.0
-          </span>
-        </div>
-
-        {/* Center Draggable Area */}
-        <div className="flex-1 h-full cursor-default" />
-
-        {/* Windows Native Controls: Réduire, Agrandir / Restaurer, Fermer */}
+      {/* Windows 11 Native Titlebar with Drag & Window Controls (Strictly for Electron Windows App) */}
+      {isElectron && (
         <div 
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          className="flex items-center h-full -mr-3"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          onDoubleClick={handleMaximize}
+          className={`h-9 w-full flex items-center justify-between px-3 border-b select-none shrink-0 z-50 backdrop-blur-md transition-colors ${
+            isLiquidGlass
+              ? 'bg-[#090d1c]/80 border-white/10 text-slate-300'
+              : isLight
+              ? 'bg-slate-100/90 border-slate-200 text-slate-700'
+              : 'bg-[#18191c]/95 border-white/10 text-slate-300'
+          }`}
         >
-          <button
-            onClick={handleMinimize}
-            className={`h-9 w-11 flex items-center justify-center transition-colors cursor-pointer ${
-              isLight ? 'hover:bg-black/10 text-slate-700' : 'hover:bg-white/10 text-slate-300 hover:text-white'
-            }`}
-            title="Réduire"
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={handleMaximize}
-            className={`h-9 w-11 flex items-center justify-center transition-colors cursor-pointer ${
-              isLight ? 'hover:bg-black/10 text-slate-700' : 'hover:bg-white/10 text-slate-300 hover:text-white'
-            }`}
-            title={isMaximized ? "Restaurer" : "Agrandir"}
-          >
-            {isMaximized ? <Maximize2 className="w-3.5 h-3.5" /> : <Square className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={handleClose}
-            className="h-9 w-11 flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#EA4335] transition-colors cursor-pointer"
-            title="Fermer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center space-x-2 text-xs font-semibold pointer-events-none">
+            <TaskFlowLogo size={18} showText={false} />
+            <span className="text-[11px] font-medium tracking-tight">TaskFlow Windows</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF] font-mono font-bold">
+              v1.5.2
+            </span>
+          </div>
+
+          {/* Center Draggable Area */}
+          <div className="flex-1 h-full cursor-default" />
+
+          {/* Windows Native Controls: Réduire, Agrandir / Restaurer, Fermer */}
+          <WindowsWindowControls />
         </div>
-      </div>
+      )}
 
       {/* Main Body Container (Sidebar + Main) */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
@@ -500,7 +420,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
               <div className="flex items-center space-x-2.5">
                 <TaskFlowLogo size={32} showText={true} />
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF] font-mono font-bold">
-                  v1.5.0
+                  v1.5.2
                 </span>
               </div>
             </div>
@@ -532,7 +452,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
               }`}
             >
               <Layers className="w-4 h-4" />
-              <span>Nouveau & Modèles</span>
+              <span>Galerie de Modèles</span>
             </button>
 
             <button
@@ -548,49 +468,31 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
               <Folder className="w-4 h-4" />
               <span>Ouvrir un document</span>
             </button>
-
-            {/* Save Preset action */}
-            <button
-              onClick={() => openSaveCategoryPresetModal()}
-              className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl border transition-all cursor-pointer ${
-                isLiquidGlass
-                  ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-400/30 text-amber-200'
-                  : isLight
-                  ? 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-900'
-                  : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20 text-amber-300'
-              }`}
-              title="Enregistrer une catégorie avec ses sous-projets comme Preset réutilisable"
-            >
-              <Star className="w-4 h-4 text-amber-400 fill-amber-400/40 shrink-0" />
-              <span className="truncate">Enregistrer un Preset</span>
-            </button>
           </nav>
 
           {/* Quick Resume Active Workspace Button */}
-          {activeBoard && (
-            <div className={`p-3 rounded-2xl border transition-all ${
-              isLiquidGlass
-                ? 'bg-gradient-to-br from-cyan-950/30 to-blue-950/20 border-cyan-400/30'
-                : isLight
-                ? 'bg-blue-50 border-blue-200'
-                : 'bg-white/5 border-white/10'
-            }`}>
-              <div className="flex items-center justify-between mb-1 text-[10px] text-slate-400 font-medium">
-                <span>Document en cours</span>
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: activeBoard.color || '#007AFF' }} />
-              </div>
-              <p className={`font-semibold text-xs truncate mb-2.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                {activeBoard.title}
-              </p>
-              <button
-                onClick={onOpenWorkspace}
-                className="w-full py-2 px-3 rounded-xl bg-[#007AFF] hover:bg-[#0062cc] text-white text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-md shadow-[#007AFF]/25 apple-btn-active cursor-pointer transition-all"
-              >
-                <span>Accéder au document</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+          <div className={`p-3 rounded-2xl border transition-all ${
+            isLiquidGlass
+              ? 'bg-gradient-to-br from-cyan-950/30 to-blue-950/20 border-cyan-400/30'
+              : isLight
+              ? 'bg-blue-50 border-blue-200'
+              : 'bg-white/5 border-white/10'
+          }`}>
+            <div className="flex items-center justify-between mb-1 text-[10px] text-slate-400 font-medium">
+              <span>Document en cours</span>
+              <span className="w-2 h-2 rounded-full bg-[#007AFF]" />
             </div>
-          )}
+            <p className={`font-semibold text-xs truncate mb-2.5 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              {masterDocTitle}
+            </p>
+            <button
+              onClick={onOpenWorkspace}
+              className="w-full py-2 px-3 rounded-xl bg-[#007AFF] hover:bg-[#0062cc] text-white text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-md shadow-[#007AFF]/25 apple-btn-active cursor-pointer transition-all"
+            >
+              <span>Accéder au document</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Footer: User Profile, Theme & Settings */}
@@ -619,6 +521,27 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
               </div>
             </div>
             <Cloud className={`w-4 h-4 ${user ? 'text-emerald-400' : 'text-slate-400'}`} />
+          </div>
+
+          {/* Google Drive Style Minimal Storage Indicator (Below User Profile) */}
+          <div className="px-1 py-1 space-y-1.5">
+            <div className="flex items-center space-x-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+              <Cloud className="w-4 h-4 text-slate-400" />
+              <span>Espace de stockage</span>
+            </div>
+
+            <div className="w-full bg-black/10 dark:bg-white/15 h-1 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-[#007AFF] transition-all duration-500 rounded-full"
+                style={{ width: `${Math.max(1, Math.min(100, projectQuotaPercent))}%` }}
+              />
+            </div>
+
+            <p className="text-[11.5px] text-slate-600 dark:text-slate-300">
+              {Number(docSizeMb) < 1 
+                ? `${(docSizeBytes / 1024).toFixed(1).replace('.', ',')} Ko utilisés sur 1 Go`
+                : `${Number(docSizeMb).toFixed(2).replace('.', ',')} Mo utilisés sur 1 Go`}
+            </p>
           </div>
 
           {/* Quick Actions Bar */}
@@ -670,7 +593,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
 
         {/* TAB: ACCUEIL */}
         {activeNav === 'home' && (
-          <div className="space-y-8 relative z-10">
+          <div className="space-y-8 relative z-10 animate-fade-in">
             {/* Header / Welcome greeting */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -680,37 +603,6 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                 <p className={`text-xs sm:text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                   Démarrez un nouveau tableau, chargez un modèle ou reprenez vos projets récents.
                 </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => openSaveCategoryPresetModal()}
-                  className={`px-3.5 py-2 rounded-full border text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
-                    isLiquidGlass
-                      ? 'bg-amber-500/15 border-amber-400/40 text-amber-200 hover:bg-amber-500/25'
-                      : isLight
-                      ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900'
-                      : 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/30 text-amber-300'
-                  }`}
-                  title="Enregistrer une catégorie avec ses sous-projets comme Preset réutilisable"
-                >
-                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/40" />
-                  <span>Enregistrer une catégorie en Preset</span>
-                </button>
-
-                <button
-                  onClick={() => setIsCreatingCustomTemplate(true)}
-                  className={`px-3.5 py-2 rounded-full border text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
-                    isLiquidGlass
-                      ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/25'
-                      : isLight
-                      ? 'bg-white hover:bg-slate-50 border-slate-300 text-slate-800'
-                      : 'bg-white/10 hover:bg-white/15 border-white/15 text-white'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-[#007AFF]" />
-                  <span>Créer un nouveau modèle</span>
-                </button>
               </div>
             </div>
 
@@ -733,11 +625,11 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                 {/* 1. Blank Board Card */}
                 <div 
                   onClick={() => handleLaunchTemplate(TEMPLATES_CATALOG[1])}
-                  className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:scale-[1.02] active:scale-[0.99] relative overflow-hidden ${
+                  className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:-translate-y-1 active:scale-[0.99] relative overflow-hidden ${
                     isLiquidGlass
                       ? 'apple-liquid-card hover:border-[#34C759]/60 hover:shadow-lg'
                       : isLight 
-                      ? 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 shadow-sm' 
+                      ? 'bg-white hover:bg-slate-50/90 border-slate-200/90 hover:border-[#34C759]/50 shadow-xs hover:shadow-md' 
                       : 'bg-[#1c1d22] hover:bg-[#23242b] border-white/10 hover:border-white/20'
                   }`}
                 >
@@ -753,7 +645,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                     <h3 className={`font-bold text-sm tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                       Tableau Vierge
                     </h3>
-                    <p className={`text-[11px] mt-1 leading-snug ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <p className={`text-[11px] mt-1 leading-snug ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                       Démarrez un document vierge avec vos 3 colonnes fluides.
                     </p>
                   </div>
@@ -764,14 +656,14 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                   </div>
                 </div>
 
-                {/* 2. Registered Standard Workspace Model (Existing Grouping) */}
+                {/* 2. Current Document Card */}
                 <div 
-                  onClick={() => handleLaunchTemplate(TEMPLATES_CATALOG[0])}
-                  className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:scale-[1.02] active:scale-[0.99] relative overflow-hidden ${
+                  onClick={onOpenWorkspace}
+                  className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:-translate-y-1 active:scale-[0.99] relative overflow-hidden ${
                     isLiquidGlass
                       ? 'apple-liquid-card border-cyan-400/40 bg-gradient-to-br from-cyan-950/40 via-blue-950/30 to-[#12182b]/50 shadow-xl'
                       : isLight 
-                      ? 'bg-white hover:bg-slate-50 border-[#007AFF]/40 shadow-md ring-1 ring-[#007AFF]/20' 
+                      ? 'bg-white hover:bg-blue-50/40 border-[#007AFF] shadow-md ring-2 ring-[#007AFF]/20' 
                       : 'bg-[#1c1d22] hover:bg-[#23242b] border-[#007AFF]/40 ring-1 ring-[#007AFF]/20'
                   }`}
                 >
@@ -781,19 +673,19 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                     </div>
                     <div className="flex items-center space-x-1.5 mb-1">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#007AFF]/20 text-[#007AFF]">
-                        Modèle Enregistré
+                        Document Actif
                       </span>
                     </div>
                     <h3 className={`font-bold text-sm tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                      Modèle Standard TaskFlow
+                      {masterDocTitle}
                     </h3>
-                    <p className={`text-[11px] mt-1 leading-snug ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Votre espace enregistré actuel (3 projets : Sprints, Design UI, Personnel).
+                    <p className={`text-[11px] mt-1 leading-snug ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      Accédez directement à votre document ({projects.length} catégories, {allTasks.length} tâches).
                     </p>
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs font-semibold text-[#007AFF]">
-                    <span>Ouvrir l'espace</span>
+                    <span>Ouvrir le document</span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
@@ -801,11 +693,11 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                 {/* 3. Agile Sprint Template */}
                 <div 
                   onClick={() => handleLaunchTemplate(TEMPLATES_CATALOG[2])}
-                  className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:scale-[1.02] active:scale-[0.99] ${
+                  className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:-translate-y-1 active:scale-[0.99] ${
                     isLiquidGlass
                       ? 'apple-liquid-card hover:border-[#007AFF]/50'
                       : isLight 
-                      ? 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 shadow-sm' 
+                      ? 'bg-white hover:bg-slate-50/90 border-slate-200/90 hover:border-blue-400/50 shadow-xs hover:shadow-md' 
                       : 'bg-[#1c1d22] hover:bg-[#23242b] border-white/10 hover:border-white/20'
                   }`}
                 >
@@ -814,14 +706,14 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                       <Code className="w-6 h-6 text-[#007AFF]" />
                     </div>
                     <div className="flex items-center space-x-1.5 mb-1">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-500">
                         Technique
                       </span>
                     </div>
                     <h3 className={`font-bold text-sm tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                       Agile & Sprints
                     </h3>
-                    <p className={`text-[11px] mt-1 leading-snug ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <p className={`text-[11px] mt-1 leading-snug ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                       Idéal pour planifier les tâches de dev, bugs et cycles de livraison.
                     </p>
                   </div>
@@ -836,20 +728,20 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                 {customTemplates.length > 0 ? (
                   <div 
                     onClick={() => handleLaunchTemplate(customTemplates[0])}
-                    className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:scale-[1.02] active:scale-[0.99] relative overflow-hidden ${
+                    className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:-translate-y-1 active:scale-[0.99] relative overflow-hidden ${
                       isLiquidGlass
                         ? 'apple-liquid-card border-amber-400/40 bg-gradient-to-br from-amber-950/30 to-[#12182b]/50 shadow-lg'
                         : isLight 
-                        ? 'bg-amber-50/70 hover:bg-amber-50 border-amber-300 shadow-sm' 
+                        ? 'bg-amber-50/70 hover:bg-amber-50 border-amber-300 shadow-xs hover:shadow-md' 
                         : 'bg-[#201d18] hover:bg-[#28231c] border-amber-500/30'
                     }`}
                   >
                     <div>
                       <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                        <Star className="w-6 h-6 text-amber-400 fill-amber-400/40" />
+                        <Star className="w-6 h-6 text-amber-500 fill-amber-500/40" />
                       </div>
                       <div className="flex items-center space-x-1.5 mb-1">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600">
                           {customTemplates[0].badge || 'Votre Preset'}
                         </span>
                       </div>
@@ -861,7 +753,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                       </p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs font-semibold text-amber-400">
+                    <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs font-semibold text-amber-500">
                       <span>Charger ce Preset</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </div>
@@ -869,11 +761,11 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                 ) : (
                   <div 
                     onClick={() => handleLaunchTemplate(TEMPLATES_CATALOG[4])}
-                    className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:scale-[1.02] active:scale-[0.99] ${
+                    className={`p-4 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:-translate-y-1 active:scale-[0.99] ${
                       isLiquidGlass
                         ? 'apple-liquid-card hover:border-[#FF9500]/50'
                         : isLight 
-                        ? 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 shadow-sm' 
+                        ? 'bg-white hover:bg-slate-50/90 border-slate-200/90 hover:border-amber-400/50 shadow-xs hover:shadow-md' 
                         : 'bg-[#1c1d22] hover:bg-[#23242b] border-white/10 hover:border-white/20'
                     }`}
                   >
@@ -882,14 +774,14 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                         <Sparkles className="w-6 h-6 text-[#FF9500]" />
                       </div>
                       <div className="flex items-center space-x-1.5 mb-1">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600">
                           Marketing
                         </span>
                       </div>
                       <h3 className={`font-bold text-sm tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                         Campagnes & Contenus
                       </h3>
-                      <p className={`text-[11px] mt-1 leading-snug ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                      <p className={`text-[11px] mt-1 leading-snug ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                         Planning éditorial, création visuelle et calendrier réseaux.
                       </p>
                     </div>
@@ -903,7 +795,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
               </div>
             </div>
 
-            {/* Section: Documents & Gros Documents récents (Word-style lower section) */}
+            {/* Section: Document & Catégories (Word-style lower section) */}
             <div className="space-y-4 pt-4">
               {/* Toast message if preset saved */}
               {presetToastMessage && (
@@ -919,65 +811,14 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
               )}
 
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-black/10 dark:border-white/10 pb-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center space-x-2 mr-2">
-                    <Clock className="w-4 h-4 text-[#007AFF]" />
-                    <h2 className={`text-base font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                      {recentViewMode === 'categories' 
-                        ? 'Gros Document Unifié (Toutes les catégories réunies)' 
-                        : `Projets individuels (${filteredBoards.length})`}
-                    </h2>
-                  </div>
-
-                  {/* Mode Selector Toggle: Gros Document Unifié vs Projets Individuels */}
-                  <div className={`flex items-center p-0.5 rounded-full border ${
-                    isLight ? 'bg-slate-100 border-slate-300' : 'bg-black/30 border-white/10'
-                  }`}>
-                    <button
-                      type="button"
-                      onClick={() => handleSetRecentViewMode('categories')}
-                      className={`flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                        recentViewMode === 'categories'
-                          ? 'bg-[#007AFF] text-white shadow-xs font-bold'
-                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-white'
-                      }`}
-                      title="Regrouper toutes les catégories et projets dans un seul gros document unifié"
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>Gros Document Unifié</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSetRecentViewMode('boards')}
-                      className={`flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                        recentViewMode === 'boards'
-                          ? 'bg-[#007AFF] text-white shadow-xs font-bold'
-                          : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-white'
-                      }`}
-                      title="Afficher chaque projet individuellement"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Projets individuels ({filteredBoards.length})</span>
-                    </button>
-                  </div>
+                <div className="flex items-center space-x-2 mr-2">
+                  <Clock className="w-4 h-4 text-[#007AFF]" />
+                  <h2 className={`text-base font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    Votre Document & ses Catégories
+                  </h2>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {/* Quick button to save as preset */}
-                  <button
-                    onClick={() => openSaveCategoryPresetModal('__ALL__')}
-                    className={`px-3.5 py-1.5 rounded-full border text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 ${
-                      isLiquidGlass
-                        ? 'bg-amber-500/15 border-amber-400/40 text-amber-200 hover:bg-amber-500/25'
-                        : isLight
-                        ? 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-900'
-                        : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
-                    }`}
-                    title="Enregistrer ce document complet avec toutes ses catégories comme Preset"
-                  >
-                    <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/40" />
-                    <span>Enregistrer en tant que Preset</span>
-                  </button>
 
                   {/* Search bar inside Recents */}
                   <div className="relative w-full sm:w-56">
@@ -997,16 +838,15 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                 </div>
               </div>
 
-              {/* View 1: UN SEUL GROS DOCUMENT UNIFIÉ REGROUPANT TOUTES LES CATÉGORIES */}
-              {recentViewMode === 'categories' ? (
-                <div className="space-y-5">
-                  {categoryGroups.length === 0 ? (
-                    <div className="py-12 text-center text-slate-400 text-xs">
-                      Aucun document ni projet trouvé.
-                    </div>
-                  ) : (
-                    <>
-                      {/* LE GROS DOCUMENT UNIQUE CONTENANT TOUTES LES CATÉGORIES */}
+              {/* DOCUMENT PRINCIPAL CONTENANT SES CATÉGORIES */}
+              <div className="space-y-5">
+                {categoryGroups.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 text-xs">
+                    Aucun document ni projet trouvé.
+                  </div>
+                ) : (
+                  <>
+                      {/* LE DOCUMENT UNIQUE CONTENANT TOUTES LES CATÉGORIES */}
                       <div
                         className={`p-5 md:p-6 rounded-3xl border transition-all duration-200 space-y-5 group ${
                           isLiquidGlass
@@ -1016,7 +856,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                             : 'bg-[#18191d] hover:bg-[#1e1f26] border-[#007AFF]/40 ring-1 ring-[#007AFF]/20 shadow-md'
                         }`}
                       >
-                        {/* Header du Gros Document Unifié */}
+                        {/* Header du Document Principal */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="flex items-center space-x-3.5">
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#007AFF] to-[#00C6FF] text-white flex items-center justify-center shadow-md shadow-[#007AFF]/30 shrink-0">
@@ -1062,44 +902,86 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                                   </div>
                                 )}
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#007AFF]/15 text-[#007AFF] border border-[#007AFF]/30">
-                                  Gros Document Unifié
+                                  Document standard
                                 </span>
                                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                  {categoryGroups.length} catégories réunies &bull; {filteredBoards.length} projets
+                                  {categoryGroups.length} catégories &bull; {filteredBoards.length} projets
                                 </span>
                               </div>
                               <p className={`text-xs mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                                {allTasks.length} tâches au total &bull; {allTasks.filter(t => t.status === 'done').length} terminées &bull; {allTasks.filter(t => t.status === 'in_progress').length} en cours &bull; {allTasks.filter(t => t.status === 'todo').length} à faire
+                                {documentTasks.length} tâches au total &bull; {documentTasks.filter(t => t.status === 'done').length} terminées &bull; {documentTasks.filter(t => t.status === 'in_progress').length} en cours &bull; {documentTasks.filter(t => t.status === 'todo').length} à faire
                               </p>
                             </div>
                           </div>
 
-                          {/* Actions principales sur le Gros Document */}
-                          <div className="flex items-center space-x-2 shrink-0">
+                          {/* Actions principales sur le Document */}
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
                             <button
-                              onClick={() => openSaveCategoryPresetModal('__ALL__')}
-                              className={`px-4 py-2 rounded-full border text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm ${
+                              type="button"
+                              onClick={() => setIsAddingCategoryInline(true)}
+                              className={`px-3.5 py-2 rounded-full border text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm ${
                                 isLiquidGlass
-                                  ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-400/40 text-amber-200'
+                                  ? 'bg-blue-500/15 hover:bg-blue-500/25 border-blue-400/40 text-blue-200'
                                   : isLight
-                                  ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900'
-                                  : 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/30 text-amber-300'
+                                  ? 'bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-800'
+                                  : 'bg-blue-500/15 hover:bg-blue-500/25 border-blue-500/30 text-blue-300'
                               }`}
-                              title="Enregistrer ce document complet avec toutes ses catégories comme Preset réutilisable"
+                              title="Créer une nouvelle catégorie dans ce document"
                             >
-                              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/40" />
-                              <span>Enregistrer en tant que Preset</span>
+                              <FolderPlus className="w-3.5 h-3.5 text-[#007AFF]" />
+                              <span>+ Nouvelle catégorie</span>
                             </button>
 
                             <button
                               onClick={onOpenWorkspace}
                               className="px-5 py-2 rounded-full bg-[#007AFF] hover:bg-[#0062cc] text-white text-xs font-bold flex items-center space-x-2 shadow-md shadow-[#007AFF]/25 transition-all cursor-pointer"
                             >
-                              <span>Ouvrir ce Gros Document</span>
+                              <span>Ouvrir ce Document</span>
                               <ArrowRight className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
+
+                        {/* Formulaire inline de création de nouvelle catégorie */}
+                        {isAddingCategoryInline && (
+                          <form 
+                            onSubmit={handleCreateCategoryInline}
+                            className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center gap-3 animate-in fade-in ${
+                              isLight ? 'bg-blue-50/90 border-blue-300' : 'bg-blue-950/40 border-blue-500/40'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2 shrink-0 font-bold text-xs text-[#007AFF]">
+                              <FolderPlus className="w-4 h-4" />
+                              <span>Nouvelle catégorie :</span>
+                            </div>
+                            <input
+                              type="text"
+                              value={newCategoryName}
+                              onChange={(e) => setNewCategoryName(e.target.value)}
+                              placeholder="Ex: Développements, Scolaire, Personnel, Sport, Finance..."
+                              className={`flex-1 w-full text-xs px-3 py-1.5 rounded-xl border outline-none ${
+                                isLight ? 'bg-white border-blue-400 text-slate-900' : 'bg-black/60 border-blue-400 text-white'
+                              }`}
+                              autoFocus
+                            />
+                            <div className="flex items-center space-x-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setIsAddingCategoryInline(false)}
+                                className="px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-white cursor-pointer"
+                              >
+                                Annuler
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={!newCategoryName.trim()}
+                                className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[#007AFF] hover:bg-blue-600 text-white cursor-pointer disabled:opacity-50"
+                              >
+                                Créer la catégorie
+                              </button>
+                            </div>
+                          </form>
+                        )}
 
                         {/* Barre de progression globale */}
                         {allTasks.length > 0 && (
@@ -1115,69 +997,170 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
 
                         {/* TOUTES LES CATÉGORIES REGROUPÉES DANS CE MÊME DOCUMENT */}
                         <div className="space-y-3 pt-2">
-                          <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider block">
-                            Catégories & Projets groupés dans ce Document ({categoryGroups.length} catégories, {filteredBoards.length} projets) :
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
+                              Catégories dans ce Document ({categoryGroups.length}) :
+                            </span>
+                            {!isAddingCategoryInline && (
+                              <button
+                                type="button"
+                                onClick={() => setIsAddingCategoryInline(true)}
+                                className="text-xs text-[#007AFF] hover:underline font-semibold flex items-center space-x-1 cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Ajouter une catégorie</span>
+                              </button>
+                            )}
+                          </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {categoryGroups.map((group) => {
                               const catPercent = group.totalTasks > 0 ? Math.round((group.doneCount / group.totalTasks) * 100) : 0;
+                              const isAddingHere = addingBoardForCategory === group.categoryName;
 
                               return (
                                 <div
                                   key={group.categoryName}
-                                  className={`p-3.5 rounded-2xl border transition-all space-y-2.5 ${
-                                    isLight ? 'bg-slate-50/80 border-slate-200' : 'bg-black/30 border-white/10'
+                                  className={`p-3.5 rounded-2xl border transition-all space-y-2.5 flex flex-col justify-between ${
+                                    isLight ? 'bg-white border-slate-200/90 shadow-2xs hover:shadow-sm' : 'bg-black/30 border-white/10'
                                   }`}
                                 >
-                                  {/* Sous-en-tête de catégorie */}
-                                  <div className="flex items-center justify-between pb-1 border-b border-black/5 dark:border-white/5">
-                                    <div className="flex items-center space-x-2 font-bold text-xs truncate">
-                                      <Folder className="w-4 h-4 text-amber-400 shrink-0" />
-                                      <span className="truncate">{group.categoryName}</span>
-                                      <span className="text-[10px] text-slate-400 font-normal">({group.boards.length})</span>
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 font-mono">
-                                      {group.doneCount}/{group.totalTasks} ({catPercent}%)
-                                    </span>
-                                  </div>
-
-                                  {/* Puces de chaque projet dans cette catégorie */}
-                                  <div className="space-y-1.5">
-                                    {group.boards.map((b) => {
-                                      const bTasks = group.tasks.filter(t => t.boardId === b.id);
-                                      const bDone = bTasks.filter(t => t.status === 'done').length;
-                                      const isCurrent = b.id === activeBoardId;
-
-                                      return (
+                                  <div>
+                                    {/* Sous-en-tête de catégorie */}
+                                    <div className="flex items-center justify-between pb-1 border-b border-black/5 dark:border-white/5">
+                                      <div className="flex items-center space-x-2 font-bold text-xs truncate">
+                                        <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+                                        <span className="truncate">{group.categoryName}</span>
+                                        <span className="text-[10px] text-slate-400 font-normal">({group.boards.length})</span>
+                                      </div>
+                                      <div className="flex items-center space-x-2 shrink-0">
+                                        <span className="text-[10px] text-slate-400 font-mono">
+                                          {group.doneCount}/{group.totalTasks} ({catPercent}%)
+                                        </span>
                                         <button
-                                          key={b.id}
                                           type="button"
-                                          onClick={() => handleSelectBoard(b.id)}
-                                          className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center justify-between transition-all cursor-pointer group/chip ${
-                                            isCurrent
-                                              ? 'bg-[#007AFF]/20 border-[#007AFF]/60 text-[#007AFF] font-bold shadow-xs'
-                                              : isLight
-                                              ? 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
-                                              : 'bg-white/5 hover:bg-white/10 border-white/5 text-slate-200'
-                                          }`}
-                                          title={`Ouvrir le projet ${b.title}`}
+                                          onClick={() => setAddingBoardForCategory(isAddingHere ? null : group.categoryName)}
+                                          className="p-1 rounded-md text-slate-400 hover:text-[#007AFF] hover:bg-white/10 transition-colors cursor-pointer"
+                                          title={`Ajouter un projet dans ${group.categoryName}`}
                                         >
-                                          <div className="flex items-center space-x-2 truncate">
-                                            <span 
-                                              className="w-2 h-2 rounded-full shrink-0 group-hover/chip:scale-125 transition-transform" 
-                                              style={{ backgroundColor: b.color || '#007AFF' }} 
-                                            />
-                                            <span className="font-semibold truncate">{b.title}</span>
-                                          </div>
-                                          <div className="flex items-center space-x-1.5 shrink-0 text-[10px] opacity-60">
-                                            <span>{bTasks.length} tâche{bTasks.length > 1 ? 's' : ''} ({bDone} faite{bDone > 1 ? 's' : ''})</span>
-                                            <ArrowRight className="w-3 h-3 group-hover/chip:translate-x-0.5 transition-all text-[#007AFF]" />
-                                          </div>
+                                          <Plus className="w-3.5 h-3.5" />
                                         </button>
-                                      );
-                                    })}
+                                        {group.boards.length === 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => deleteProject(group.categoryName)}
+                                            className="p-1 rounded-md text-slate-400 hover:text-red-400 hover:bg-white/10 transition-colors cursor-pointer"
+                                            title="Supprimer cette catégorie vide"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Puces de chaque projet dans cette catégorie */}
+                                    <div className="space-y-1.5 pt-1.5">
+                                      {group.boards.length === 0 && !isAddingHere && (
+                                        <div className="py-3 px-2 text-center text-slate-400 text-xs">
+                                          <p>Aucun projet dans cette catégorie.</p>
+                                          <button
+                                            type="button"
+                                            onClick={() => setAddingBoardForCategory(group.categoryName)}
+                                            className="mt-1 text-[11px] text-[#007AFF] hover:underline font-semibold cursor-pointer"
+                                          >
+                                            + Ajouter un premier projet
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {group.boards.map((b) => {
+                                        const bTasks = group.tasks.filter(t => t.boardId === b.id);
+                                        const bDone = bTasks.filter(t => t.status === 'done').length;
+                                        const isCurrent = b.id === activeBoardId;
+
+                                        return (
+                                          <button
+                                            key={b.id}
+                                            type="button"
+                                            onClick={() => handleSelectBoard(b.id)}
+                                            className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center justify-between transition-all cursor-pointer group/chip ${
+                                              isCurrent
+                                                ? 'bg-[#007AFF]/20 border-[#007AFF]/60 text-[#007AFF] font-bold shadow-xs'
+                                                : isLight
+                                                ? 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                                                : 'bg-white/5 hover:bg-white/10 border-white/5 text-slate-200'
+                                            }`}
+                                            title={`Ouvrir le projet ${b.title}`}
+                                          >
+                                            <div className="flex items-center space-x-2 truncate">
+                                              <span 
+                                                className="w-2 h-2 rounded-full shrink-0 group-hover/chip:scale-125 transition-transform" 
+                                                style={{ backgroundColor: b.color || '#007AFF' }} 
+                                              />
+                                              <span className="font-semibold truncate">{b.title}</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1.5 shrink-0 text-[10px] opacity-60">
+                                              <span>{bTasks.length} tâche{bTasks.length > 1 ? 's' : ''} ({bDone} faite{bDone > 1 ? 's' : ''})</span>
+                                              <ArrowRight className="w-3 h-3 group-hover/chip:translate-x-0.5 transition-all text-[#007AFF]" />
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+
+                                      {/* Formulaire inline d'ajout de projet dans cette catégorie */}
+                                      {isAddingHere && (
+                                        <div className="p-2.5 rounded-xl border bg-black/20 dark:bg-white/5 space-y-2 animate-in fade-in">
+                                          <input
+                                            type="text"
+                                            value={newBoardTitleForCategory}
+                                            onChange={(e) => setNewBoardTitleForCategory(e.target.value)}
+                                            placeholder={`Nom du projet dans ${group.categoryName}...`}
+                                            className={`w-full text-xs px-2.5 py-1.5 rounded-lg border outline-none ${
+                                              isLight ? 'bg-white border-blue-400 text-slate-900' : 'bg-black/50 border-blue-400 text-white'
+                                            }`}
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleCreateBoardForCategory(group.categoryName);
+                                              } else if (e.key === 'Escape') {
+                                                setAddingBoardForCategory(null);
+                                              }
+                                            }}
+                                          />
+                                          <div className="flex justify-end space-x-1.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => setAddingBoardForCategory(null)}
+                                              className="px-2 py-0.5 text-[11px] text-slate-400 hover:text-white cursor-pointer"
+                                            >
+                                              Annuler
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCreateBoardForCategory(group.categoryName)}
+                                              disabled={!newBoardTitleForCategory.trim()}
+                                              className="px-3 py-0.5 text-[11px] font-bold bg-[#007AFF] hover:bg-blue-600 text-white rounded-lg cursor-pointer disabled:opacity-50"
+                                            >
+                                              Ajouter
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
+
+                                  {/* Bouton d'ajout rapide en pied de carte */}
+                                  {!isAddingHere && group.boards.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setAddingBoardForCategory(group.categoryName)}
+                                      className="w-full pt-1.5 text-[11px] text-slate-400 hover:text-[#007AFF] font-medium transition-colors flex items-center justify-center space-x-1 cursor-pointer border-t border-black/5 dark:border-white/5"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      <span>Ajouter un projet</span>
+                                    </button>
+                                  )}
                                 </div>
                               );
                             })}
@@ -1185,7 +1168,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                         </div>
                       </div>
 
-                      {/* AUTRES PRESETS & GROS DOCUMENTS ENREGISTRÉS PAR L'UTILISATEUR (SI EXISTANTS) */}
+                      {/* AUTRES MODÈLES & PRESETS ENREGISTRÉS PAR L'UTILISATEUR (SI EXISTANTS) */}
                       {customTemplates.length > 0 && (
                         <div className="space-y-3 pt-2">
                           <h3 className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -1236,92 +1219,8 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                     </>
                   )}
                 </div>
-              ) : (
-                /* View 2: Documents individuels */
-                <div className="space-y-2">
-                  {filteredBoards.length === 0 ? (
-                    <div className="py-12 text-center text-slate-400 text-xs">
-                      Aucun document ne correspond à votre recherche.
-                    </div>
-                  ) : (
-                    filteredBoards.map((doc) => {
-                      const docTasks = allTasks.filter(t => t.boardId === doc.id);
-                      const doneCount = docTasks.filter(t => t.status === 'done').length;
-                      const isActive = doc.id === activeBoardId;
-
-                      return (
-                        <div
-                          key={doc.id}
-                          onClick={() => handleSelectBoard(doc.id)}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 group hover:scale-[1.005] ${
-                            isActive
-                              ? 'border-[#007AFF]/60 bg-[#007AFF]/10 shadow-sm'
-                              : isLight 
-                              ? 'bg-white hover:bg-slate-50 border-slate-200' 
-                              : 'bg-[#18191d] hover:bg-[#202127] border-white/10'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-3.5 truncate">
-                            <span 
-                              className="w-3 h-3 rounded-full shrink-0 shadow-xs" 
-                              style={{ backgroundColor: doc.color || '#007AFF' }} 
-                            />
-                            <div className="truncate">
-                              <div className="flex items-center space-x-2">
-                                <h4 className={`text-xs font-bold truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                                  {doc.title}
-                                </h4>
-                                {isActive && (
-                                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-[#007AFF]/20 text-[#007AFF] font-bold">
-                                    Actif
-                                  </span>
-                                )}
-                                {doc.projectName && (
-                                  <span className={`text-[9px] px-2 py-0.2 rounded-full border ${
-                                    isLight ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-white/5 border-white/10 text-slate-400'
-                                  }`}>
-                                    {doc.projectName}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                                {docTasks.length} tâche{docTasks.length > 1 ? 's' : ''} ({doneCount} terminée{doneCount > 1 ? 's' : ''})
-                                {doc.description && ` • ${doc.description}`}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center space-x-2 shrink-0">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                exportBoardToFile(doc.id);
-                              }}
-                              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                                isLight ? 'hover:bg-slate-100 border-slate-200 text-slate-600' : 'hover:bg-white/10 border-white/10 text-slate-400'
-                              }`}
-                              title="Exporter en fichier .taskflow"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-
-                            <button
-                              onClick={() => handleSelectBoard(doc.id)}
-                              className="px-3.5 py-1.5 rounded-full bg-[#007AFF] hover:bg-[#0062cc] text-white text-xs font-semibold flex items-center space-x-1 shadow-sm transition-all"
-                            >
-                              <span>Ouvrir</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
+              </div>
             </div>
-          </div>
         )}
 
         {/* TAB: TOUS LES MODÈLES */}
@@ -1336,38 +1235,13 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                   Sélectionnez un modèle développé par TaskFlow ou créez votre propre modèle.
                 </p>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => openSaveCategoryPresetModal()}
-                  className={`px-4 py-2 rounded-full border text-xs font-semibold flex items-center space-x-2 shadow-sm cursor-pointer transition-all ${
-                    isLiquidGlass
-                      ? 'bg-amber-500/15 border-amber-400/40 text-amber-200 hover:bg-amber-500/25'
-                      : isLight
-                      ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900'
-                      : 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/30 text-amber-300'
-                  }`}
-                  title="Enregistrer une catégorie avec ses sous-projets comme Preset réutilisable"
-                >
-                  <Star className="w-4 h-4 text-amber-400 fill-amber-400/40" />
-                  <span>Enregistrer une catégorie en Preset</span>
-                </button>
-
-                <button
-                  onClick={() => setIsCreatingCustomTemplate(true)}
-                  className="px-4 py-2 rounded-full bg-[#007AFF] hover:bg-[#0062cc] text-white text-xs font-semibold flex items-center space-x-2 shadow-md cursor-pointer transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Créer un nouveau modèle</span>
-                </button>
-              </div>
             </div>
 
             {/* Category Filter Pills */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
               {[
                 { id: 'all', label: 'Tous les modèles' },
-                { id: 'preset', label: '⭐ Presets & Gros Documents' },
+                { id: 'preset', label: '⭐ Modèles & Espaces' },
                 { id: 'registered', label: '⭐️ Modèle Enregistré' },
                 { id: 'blank', label: 'Tableau Vierge' },
                 { id: 'tech', label: 'Technique & Dev' },
@@ -1446,7 +1320,7 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                     {tmpl.boards.length > 1 && (
                       <div className="mt-2.5 p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 text-[11px] space-y-1">
                         <span className="font-semibold text-slate-400 text-[10px] uppercase block">
-                          Gros Document ({tmpl.boards.length} projets inclus) :
+                          Document complet ({tmpl.boards.length} projets inclus) :
                         </span>
                         <div className="flex flex-wrap gap-1">
                           {tmpl.boards.map((b, i) => (
@@ -1556,15 +1430,6 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
                         <div className="flex items-center space-x-1.5">
                           <button
                             type="button"
-                            onClick={() => openSaveCategoryPresetModal(proj)}
-                            className="px-2.5 py-1 rounded-full text-[10.5px] font-semibold border border-amber-400/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 flex items-center space-x-1 transition-all cursor-pointer"
-                            title="Enregistrer cette catégorie comme Preset"
-                          >
-                            <Star className="w-3 h-3 fill-amber-400/40" />
-                            <span>Preset</span>
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => handleOpenCategoryGroup(projBoards)}
                             className="px-2.5 py-1 rounded-full text-[10.5px] font-semibold bg-[#007AFF] text-white hover:bg-[#0062cc] flex items-center space-x-1 transition-all cursor-pointer"
                           >
@@ -1601,262 +1466,6 @@ export const StartHomeScreen: React.FC<StartHomeScreenProps> = ({
           </div>
         )}
 
-        {/* Modal: Créer un nouveau modèle personnalisé */}
-        {isCreatingCustomTemplate && (
-          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
-            <div className={`p-6 rounded-3xl border shadow-2xl max-w-md w-full space-y-4 ${
-              isLiquidGlass
-                ? 'apple-liquid-glass bg-[#111827]/95 border-white/20 text-white'
-                : isLight
-                ? 'bg-white border-slate-200 text-slate-800'
-                : 'bg-[#1c1d22] border-white/15 text-white'
-            }`}>
-              <div className="flex items-center justify-between border-b pb-3 border-black/10 dark:border-white/10">
-                <div className="flex items-center space-x-2">
-                  <Sparkles className="w-5 h-5 text-[#007AFF]" />
-                  <h3 className="font-bold text-sm">Créer un nouveau modèle</h3>
-                </div>
-                <button 
-                  onClick={() => setIsCreatingCustomTemplate(false)}
-                  className="p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold mb-1">Nom du modèle</label>
-                  <input
-                    type="text"
-                    value={customTitle}
-                    onChange={(e) => setCustomTitle(e.target.value)}
-                    placeholder="Ex: Refonte Site Client, Sprint IA..."
-                    className={`w-full p-2.5 rounded-xl border focus:outline-none ${
-                      isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-black/30 border-white/15 text-white'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold mb-1">Dossier / Projet</label>
-                  <input
-                    type="text"
-                    value={customProjectName}
-                    onChange={(e) => setCustomProjectName(e.target.value)}
-                    placeholder="Ex: Projets Personnalisés"
-                    className={`w-full p-2.5 rounded-xl border focus:outline-none ${
-                      isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-black/30 border-white/15 text-white'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold mb-1">Description (optionnelle)</label>
-                  <textarea
-                    rows={2}
-                    value={customDescription}
-                    onChange={(e) => setCustomDescription(e.target.value)}
-                    placeholder="Objectif et méthodologie de ce modèle..."
-                    className={`w-full p-2.5 rounded-xl border focus:outline-none ${
-                      isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-black/30 border-white/15 text-white'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold mb-1.5">Couleur d'accentuation</label>
-                  <div className="flex gap-2">
-                    {['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF3B30', '#00C6FF'].map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setCustomColor(c)}
-                        className={`w-7 h-7 rounded-full transition-transform cursor-pointer ${customColor === c ? 'ring-2 ring-white scale-110' : ''}`}
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-black/10 dark:border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingCustomTemplate(false)}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/15 text-slate-300 cursor-pointer"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveCustomTemplate}
-                  disabled={!customTitle.trim()}
-                  className="px-5 py-2 rounded-full text-xs font-bold bg-[#007AFF] hover:bg-[#0062cc] disabled:opacity-50 text-white cursor-pointer shadow-md"
-                >
-                  Enregistrer et Ouvrir
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal: Enregistrer une catégorie comme Preset (Gros Document) */}
-        {isSavingCategoryPresetModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
-            <div className={`p-6 rounded-3xl border shadow-2xl max-w-lg w-full space-y-4 ${
-              isLiquidGlass
-                ? 'apple-liquid-glass bg-[#111827]/95 border-white/20 text-white'
-                : isLight
-                ? 'bg-white border-slate-200 text-slate-800'
-                : 'bg-[#1c1d22] border-white/15 text-white'
-            }`}>
-              {/* Modal Header */}
-              <div className="flex items-center justify-between border-b pb-3 border-black/10 dark:border-white/10">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                    <Star className="w-4 h-4 fill-amber-400/40" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm sm:text-base">Enregistrer comme Preset (Gros Document)</h3>
-                    <p className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Conserve tous les projets et tâches de cette catégorie dans un modèle réutilisable.
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setIsSavingCategoryPresetModalOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Form Body */}
-              <div className="space-y-3.5 text-xs">
-                {/* 1. Category Selection */}
-                <div>
-                  <label className="block font-semibold mb-1">Catégorie / Groupe à enregistrer</label>
-                  <select
-                    value={targetCategoryForPreset}
-                    onChange={(e) => handleTargetCategoryChange(e.target.value)}
-                    className={`w-full p-2.5 rounded-xl border font-medium focus:outline-none cursor-pointer ${
-                      isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-black/30 border-white/15 text-white'
-                    }`}
-                  >
-                    {categoryGroups.map(g => (
-                      <option key={g.categoryName} value={g.categoryName} className="text-slate-900">
-                        📁 {g.categoryName} ({g.boards.length} projet{g.boards.length > 1 ? 's' : ''}, {g.totalTasks} tâche{g.totalTasks > 1 ? 's' : ''})
-                      </option>
-                    ))}
-                    <option value="__ALL__" className="text-slate-900">
-                      🌐 Tout l'espace de travail ({boards.length} projets, {allTasks.length} tâches)
-                    </option>
-                  </select>
-                </div>
-
-                {/* 2. Preset Title */}
-                <div>
-                  <label className="block font-semibold mb-1">Nom du Preset</label>
-                  <input
-                    type="text"
-                    value={presetTitle}
-                    onChange={(e) => setPresetTitle(e.target.value)}
-                    placeholder="Ex: Preset Développements..."
-                    className={`w-full p-2.5 rounded-xl border focus:outline-none font-medium ${
-                      isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-black/30 border-white/15 text-white'
-                    }`}
-                  />
-                </div>
-
-                {/* 3. Badge */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block font-semibold mb-1">Badge personnalisé</label>
-                    <input
-                      type="text"
-                      value={presetBadge}
-                      onChange={(e) => setPresetBadge(e.target.value)}
-                      placeholder="Ex: Gros Document, Dév Pro..."
-                      className={`w-full p-2 rounded-xl border focus:outline-none ${
-                        isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-black/30 border-white/15 text-white'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold mb-1.5">Couleur d'accent</label>
-                    <div className="flex gap-1.5 pt-0.5">
-                      {['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF3B30', '#00C6FF'].map(c => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setPresetColor(c)}
-                          className={`w-6 h-6 rounded-full transition-transform cursor-pointer ${presetColor === c ? 'ring-2 ring-white scale-110' : ''}`}
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Description */}
-                <div>
-                  <label className="block font-semibold mb-1">Description du Preset</label>
-                  <textarea
-                    rows={2}
-                    value={presetDescription}
-                    onChange={(e) => setPresetDescription(e.target.value)}
-                    placeholder="Description du contenu de ce gros document..."
-                    className={`w-full p-2.5 rounded-xl border focus:outline-none leading-relaxed ${
-                      isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-black/30 border-white/15 text-white'
-                    }`}
-                  />
-                </div>
-
-                {/* 5. Live Included Sub-Projects Preview */}
-                <div className={`p-3 rounded-2xl border text-xs space-y-1.5 ${
-                  isLight ? 'bg-slate-100/70 border-slate-200' : 'bg-black/30 border-white/10'
-                }`}>
-                  <span className="font-bold text-[10px] uppercase text-slate-400 block tracking-wider">
-                    Contenu inclus dans ce Preset :
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(targetCategoryForPreset === '__ALL__' 
-                      ? boards 
-                      : boards.filter(b => (b.projectName || 'Non classé') === targetCategoryForPreset)
-                    ).map(b => (
-                      <span key={b.id} className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/10 font-mono text-[11px]">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: b.color || '#007AFF' }} />
-                        <span>{b.title}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-black/10 dark:border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsSavingCategoryPresetModalOpen(false)}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/15 text-slate-300 cursor-pointer"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmSavePreset}
-                  disabled={!presetTitle.trim()}
-                  className="px-5 py-2 rounded-full text-xs font-bold bg-[#007AFF] hover:bg-[#0062cc] disabled:opacity-50 text-white cursor-pointer shadow-md flex items-center space-x-1.5"
-                >
-                  <Star className="w-3.5 h-3.5 fill-white" />
-                  <span>Enregistrer le Preset</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   </div>

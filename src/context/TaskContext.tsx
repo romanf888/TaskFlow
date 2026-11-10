@@ -77,7 +77,11 @@ interface TaskContextType {
   selectedPriority: string;
   setSelectedPriority: (p: string) => void;
 
-  // Document / Board actions
+  // Document / Workspace actions (Single Unified Document containing categories & projects)
+  masterDocTitle: string;
+  setMasterDocTitle: (title: string) => void;
+  createNewDocument: (title?: string) => void;
+  exportDocumentToFile: () => void;
   setActiveBoardId: (id: string) => void;
   createBoard: (title: string, description?: string, icon?: string, color?: string, projectName?: string, teamSessionCode?: string) => Promise<string>;
   updateBoard: (boardId: string, updates: Partial<BoardDocument>) => Promise<void>;
@@ -153,8 +157,25 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
 
   // Boards and tasks state
+  const LOCAL_STORAGE_MASTER_DOC_TITLE_KEY = 'taskflow_master_doc_title';
   const LOCAL_STORAGE_PROJECTS_KEY = 'taskflow_windows_projects_v2';
   const LOCAL_STORAGE_BOARD_SORT_KEY = 'taskflow_windows_board_sort_v2';
+
+  const [masterDocTitle, setMasterDocTitleState] = useState<string>(() => {
+    try {
+      return localStorage.getItem(LOCAL_STORAGE_MASTER_DOC_TITLE_KEY) || 'Mon Document de Travail';
+    } catch {}
+    return 'Mon Document de Travail';
+  });
+
+  const setMasterDocTitle = (title: string) => {
+    const trimmed = title.trim() || 'Mon Document de Travail';
+    setMasterDocTitleState(trimmed);
+    safeLocalStorageSet(LOCAL_STORAGE_MASTER_DOC_TITLE_KEY, trimmed);
+    if (user) {
+      syncDocumentToFirestore(trimmed);
+    }
+  };
 
   const [boards, setBoards] = useState<BoardDocument[]>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_BOARDS_KEY);
@@ -312,25 +333,44 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updated = [...projects, trimmed];
       setProjects(updated);
       persistUserSettings(updated);
+      if (user) {
+        syncDocumentToFirestore(undefined, updated);
+      }
       showNotification(`Nouveau projet créé : "${trimmed}"`);
     }
   };
 
   const deleteProject = (name: string) => {
     const updated = projects.filter((p) => p !== name);
+    let updatedBoards: BoardDocument[] = [];
     setProjects(updated);
-    setBoards((prev) => prev.map((b) => b.projectName === name ? { ...b, projectName: undefined } : b));
+    setBoards((prev) => {
+      updatedBoards = prev.map((b) => (b.projectName === name ? { ...b, projectName: undefined } : b));
+      safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(updatedBoards));
+      return updatedBoards;
+    });
     persistUserSettings(updated);
+    if (user) {
+      syncDocumentToFirestore(undefined, updated, updatedBoards);
+    }
     showNotification(`Projet "${name}" supprimé.`);
   };
 
   const renameProject = (oldName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName) return;
-    const updated = projects.map((p) => p === oldName ? trimmed : p);
+    const updated = projects.map((p) => (p === oldName ? trimmed : p));
+    let updatedBoards: BoardDocument[] = [];
     setProjects(updated);
-    setBoards((prev) => prev.map((b) => b.projectName === oldName ? { ...b, projectName: trimmed } : b));
+    setBoards((prev) => {
+      updatedBoards = prev.map((b) => (b.projectName === oldName ? { ...b, projectName: trimmed } : b));
+      safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(updatedBoards));
+      return updatedBoards;
+    });
     persistUserSettings(updated);
+    if (user) {
+      syncDocumentToFirestore(undefined, updated, updatedBoards);
+    }
     showNotification(`Projet renommé en "${trimmed}".`);
   };
 
@@ -623,7 +663,221 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsub();
   }, [user]);
 
-  // Firestore Sync when User is authenticated (Personal + Shared Team Boards)
+  // Single Unified Workspace Document sync to Firestore (1 single document in user_documents/{user.uid})
+  const syncDocumentToFirestore = useCallback(async (
+    customTitle?: string,
+    customCategories?: string[],
+    customBoards?: BoardDocument[],
+    customTasks?: Task[]
+  ) => {
+    if (!user) return;
+    try {
+      setSyncStatus('syncing');
+      const docRef = doc(db, 'user_documents', user.uid);
+      const dataToSave = cleanFirestoreData({
+        id: user.uid,
+        ownerId: user.uid,
+        title: customTitle ?? masterDocTitle,
+        categories: customCategories ?? projects,
+        boards: (customBoards ?? boards).map(b => ({ ...b, ownerId: user.uid, isCloud: true })),
+        tasks: (customTasks ?? allTasks).map(t => ({ ...t, ownerId: user.uid })),
+        boardSortPreference,
+        updatedAt: new Date().toISOString(),
+        version: '1.5.2'
+      });
+      await setDoc(docRef, dataToSave, { merge: true });
+      setSyncStatus('synced');
+      setLastSyncTime(new Date());
+    } catch (e: any) {
+      console.warn('Error syncing unified document to Firestore:', e);
+      setSyncStatus('offline');
+      handleFirestoreError(e, OperationType.WRITE, 'user_documents');
+    }
+  }, [user, masterDocTitle, projects, boards, allTasks, boardSortPreference]);
+
+  // Zero-loss task merging helper with strict timestamp-based conflict resolution
+  const mergeTaskLists = useCallback((...arrays: (Task[] | undefined)[]): Task[] => {
+    const map = new Map<string, Task>();
+
+    const insertOrUpdate = (t: Task) => {
+      if (!t || !t.id) return;
+      const existing = map.get(t.id);
+      if (!existing) {
+        map.set(t.id, t);
+      } else {
+        const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+        const incomingTime = t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
+        if (incomingTime >= existingTime) {
+          map.set(t.id, t);
+        }
+      }
+    };
+
+    // Always include INITIAL_TASKS as baseline if needed
+    INITIAL_TASKS.forEach(insertOrUpdate);
+
+    // Try reading local storage tasks
+    try {
+      const savedLocal = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
+      if (savedLocal) {
+        const parsed = JSON.parse(savedLocal);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((t) => t && insertOrUpdate(t));
+        }
+      }
+    } catch (e) {}
+
+    // Add passed arrays in order
+    arrays.forEach((arr) => {
+      if (Array.isArray(arr)) {
+        arr.forEach((t) => t && insertOrUpdate(t));
+      }
+    });
+
+    return Array.from(map.values());
+  }, []);
+
+  // One-time automatic migration check to recover tasks from old Firestore subcollections
+  const recoverOldFirestoreTasks = useCallback(async (userId: string, currentBoards: BoardDocument[]): Promise<Task[]> => {
+    const recoveredTasks: Task[] = [];
+    try {
+      const { getDocs } = await import('firebase/firestore');
+      for (const b of currentBoards) {
+        try {
+          const tasksSnap = await getDocs(collection(db, 'boards', b.id, 'tasks'));
+          tasksSnap.forEach((docSnap) => {
+            if (docSnap.exists()) {
+              recoveredTasks.push({ id: docSnap.id, ...docSnap.data() } as Task);
+            }
+          });
+        } catch (e) {}
+      }
+    } catch (e) {}
+    return recoveredTasks;
+  }, []);
+
+  // Helper to ensure every board (especially UEFN) has initial rich tasks
+  const ensureBoardTasksExist = useCallback((currentBoards: BoardDocument[], currentTasks: Task[], userId?: string): Task[] => {
+    const tasksMap = new Map<string, Task>(currentTasks.map(t => [t.id, t]));
+    const ownerId = userId || 'local-user';
+
+    currentBoards.forEach((b) => {
+      const boardTasks = currentTasks.filter((t) => t.boardId === b.id);
+      if (boardTasks.length === 0) {
+        // Generate rich sample tasks for empty board based on title
+        const titleLower = b.title.toLowerCase();
+        if (titleLower.includes('uefn') || titleLower.includes('fortnite')) {
+          const uefnSampleTasks: Task[] = [
+            {
+              id: `task_uefn_1_${b.id}`,
+              boardId: b.id,
+              ownerId,
+              title: 'Level Design Island UEFN & Modélisation 3D',
+              description: 'Conception de la carte Fortnite Creative avec Unreal Editor for Fortnite, import de décors Fab/Quixel et structuration des zones.',
+              status: 'in_progress',
+              priority: 'high',
+              category: 'Développement',
+              tags: ['UEFN', 'Level Design', '3D'],
+              subtasks: [
+                { id: `sub_u1_${b.id}`, title: 'Sculpt du terrain & placement des biomes', completed: true },
+                { id: `sub_u2_${b.id}`, title: 'Import et positionnement des props Fab/Quixel', completed: true },
+                { id: `sub_u3_${b.id}`, title: 'Réglage de l’éclairage Lumen et du ciel dynamique', completed: false }
+              ],
+              order: 0,
+              createdAt: new Date(Date.now() - 86400000).toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            {
+              id: `task_uefn_2_${b.id}`,
+              boardId: b.id,
+              ownerId,
+              title: 'Programmation Verse & Logique de jeu',
+              description: 'Développement des scripts Verse pour gérer la boucle de jeu, les apparitions de PNJ et la distribution des armes.',
+              status: 'todo',
+              priority: 'urgent',
+              category: 'Développement',
+              tags: ['Verse', 'Code', 'UEFN'],
+              subtasks: [
+                { id: `sub_u4_${b.id}`, title: 'Écriture du script Verse pour la gestion des manches', completed: false },
+                { id: `sub_u5_${b.id}`, title: 'Configuration des appareils Spawner et Triggers', completed: false },
+                { id: `sub_u6_${b.id}`, title: 'Tests de compilation Verse dans UEFN', completed: false }
+              ],
+              order: 1,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            {
+              id: `task_uefn_3_${b.id}`,
+              boardId: b.id,
+              ownerId,
+              title: 'Optimisation Mémoire & Session de test',
+              description: 'Vérification du thermomètre de mémoire (100k max), optimisation des LODs et lancement d’une session de jeu multi-joueurs.',
+              status: 'todo',
+              priority: 'medium',
+              category: 'Développement',
+              tags: ['Optimisation', 'Test'],
+              subtasks: [
+                { id: `sub_u7_${b.id}`, title: 'Analyse des métriques de mémoire par cellule', completed: false },
+                { id: `sub_u8_${b.id}`, title: 'Lancement d’un test en direct sur Fortnite', completed: false }
+              ],
+              order: 2,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+          ];
+          uefnSampleTasks.forEach(t => tasksMap.set(t.id, t));
+        } else if (titleLower.includes('youtube') || titleLower.includes('vidéo')) {
+          const ytTasks: Task[] = [
+            {
+              id: `task_yt_1_${b.id}`,
+              boardId: b.id,
+              ownerId,
+              title: 'Montage vidéo & Miniature accrocheuse',
+              description: 'Écriture du script, enregistrement audio et montage sous Premiere Pro / DaVinci Resolve.',
+              status: 'done',
+              priority: 'high',
+              category: 'Création',
+              tags: ['YouTube', 'Montage'],
+              subtasks: [
+                { id: `sub_yt1_${b.id}`, title: 'Capture vidéo 4K & enregistrement de la voix', completed: true },
+                { id: `sub_yt2_${b.id}`, title: 'Création de la miniature Photoshop', completed: true }
+              ],
+              order: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+          ];
+          ytTasks.forEach(t => tasksMap.set(t.id, t));
+        } else if (titleLower.includes('bts') || titleLower.includes('sio') || titleLower.includes('scolaire')) {
+          const btsTasks: Task[] = [
+            {
+              id: `task_bts_1_${b.id}`,
+              boardId: b.id,
+              ownerId,
+              title: 'Révisions Réseaux & Algorithmique',
+              description: 'Préparation des fiches de synthèse pour les évaluations de BTS SIO.',
+              status: 'in_progress',
+              priority: 'high',
+              category: 'Scolaire',
+              tags: ['Cours', 'Examen'],
+              subtasks: [
+                { id: `sub_bts1_${b.id}`, title: 'Schémas d’adressage IPv4/IPv6', completed: true },
+                { id: `sub_bts2_${b.id}`, title: 'Exercices d’algorithmique en Python', completed: false }
+              ],
+              order: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+          ];
+          btsTasks.forEach(t => tasksMap.set(t.id, t));
+        }
+      }
+    });
+
+    return Array.from(tasksMap.values());
+  }, []);
+
+  // Firestore Sync: Listen to the 1 single unified document for this user
   useEffect(() => {
     if (!user) {
       setSyncStatus('local');
@@ -631,127 +885,97 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setSyncStatus('syncing');
-    const boardsPath = 'boards';
+    const userDocRef = doc(db, 'user_documents', user.uid);
 
-    // Query personal boards
-    const personalBoardsQuery = query(
-      collection(db, boardsPath),
-      where('ownerId', '==', user.uid)
-    );
-
-    const activeTeamCodes = teamSessions.map((s) => s.code).filter(Boolean);
-
-    const unsubscribeBoards = onSnapshot(
-      personalBoardsQuery,
-      async (personalSnapshot) => {
-        const cloudBoards: BoardDocument[] = [];
-        personalSnapshot.forEach((docSnap) => {
-          cloudBoards.push({ id: docSnap.id, ...docSnap.data() } as BoardDocument);
-        });
-
-        // Also fetch team boards if user belongs to team sessions
-        if (activeTeamCodes.length > 0) {
-          try {
-            for (const teamCode of activeTeamCodes) {
-              const teamBoardsQuery = query(collection(db, boardsPath), where('teamSessionCode', '==', teamCode));
-              const teamSnap = await import('firebase/firestore').then(m => m.getDocs(teamBoardsQuery));
-              teamSnap.forEach((docSnap) => {
-                if (!cloudBoards.some(b => b.id === docSnap.id)) {
-                  cloudBoards.push({ id: docSnap.id, ...docSnap.data() } as BoardDocument);
-                }
-              });
-            }
-          } catch (e) {
-            console.warn('Error fetching team boards:', e);
+    const unsubscribe = onSnapshot(
+      userDocRef,
+      async (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.title && typeof data.title === 'string') {
+            setMasterDocTitleState(data.title);
+            safeLocalStorageSet(LOCAL_STORAGE_MASTER_DOC_TITLE_KEY, data.title);
           }
-        }
-
-        if (cloudBoards.length === 0) {
-          // First time cloud user: Migrate initial local boards to user's cloud account!
-          try {
-            for (const b of INITIAL_BOARDS) {
-              const cleanBoard: BoardDocument = {
-                ...b,
-                ownerId: user.uid,
-                isCloud: true,
-                updatedAt: new Date().toISOString(),
-              };
-              await setDoc(doc(db, boardsPath, cleanBoard.id), cleanFirestoreData(cleanBoard));
-            }
-            // Also upload initial tasks
-            for (const t of INITIAL_TASKS) {
-              const cleanTask: Task = {
-                ...t,
-                ownerId: user.uid,
-                updatedAt: new Date().toISOString(),
-              };
-              await setDoc(doc(db, `boards/${cleanTask.boardId}/tasks`, cleanTask.id), cleanFirestoreData(cleanTask));
-            }
-          } catch (err) {
-            handleFirestoreError(err, OperationType.WRITE, boardsPath);
+          if (Array.isArray(data.categories)) {
+            setProjects(data.categories);
+            safeLocalStorageSet(LOCAL_STORAGE_PROJECTS_KEY, JSON.stringify(data.categories));
           }
+
+          let loadedBoards: BoardDocument[] = boards;
+          if (Array.isArray(data.boards) && data.boards.length > 0) {
+            loadedBoards = data.boards;
+            setBoards(data.boards);
+            safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(data.boards));
+            if (!data.boards.some((b: any) => b.id === activeBoardId)) {
+              setActiveBoardIdState(data.boards[0].id);
+            }
+          }
+
+          // Recover tasks from old Firestore collections if needed
+          const oldRecovered = await recoverOldFirestoreTasks(user.uid, loadedBoards);
+
+          // Merge docSnap tasks with local tasks, initial tasks, and recovered tasks
+          const docTasks = Array.isArray(data.tasks) ? data.tasks : [];
+          let merged = mergeTaskLists(allTasks, docTasks, oldRecovered);
+
+          // Ensure every board has tasks populated
+          merged = ensureBoardTasksExist(loadedBoards, merged, user.uid);
+
+          setAllTasks(merged);
+          safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(merged));
+
+          if (data.boardSortPreference) {
+            setBoardSortPreferenceState(data.boardSortPreference);
+          }
+          setSyncStatus('synced');
+          setLastSyncTime(new Date());
         } else {
-          setBoards(cloudBoards);
-          // If active board isn't in user's boards, select first one
-          if (!cloudBoards.some((b) => b.id === activeBoardId)) {
-            setActiveBoardIdState(cloudBoards[0].id);
+          // First time cloud user or missing docSnap: Recover old Firestore tasks if any
+          const oldRecovered = await recoverOldFirestoreTasks(user.uid, boards);
+          let merged = mergeTaskLists(allTasks, oldRecovered);
+          merged = ensureBoardTasksExist(boards, merged, user.uid);
+
+          setAllTasks(merged);
+          safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(merged));
+
+          try {
+            await setDoc(userDocRef, cleanFirestoreData({
+              id: user.uid,
+              ownerId: user.uid,
+              title: masterDocTitle,
+              categories: projects,
+              boards: boards.map(b => ({ ...b, ownerId: user.uid, isCloud: true })),
+              tasks: merged.map(t => ({ ...t, ownerId: user.uid })),
+              boardSortPreference,
+              updatedAt: new Date().toISOString(),
+              version: '1.5.2'
+            }));
+            setSyncStatus('synced');
+            setLastSyncTime(new Date());
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, 'user_documents');
           }
         }
-        setSyncStatus('synced');
-        setLastSyncTime(new Date());
       },
       (error) => {
         setSyncStatus('offline');
-        handleFirestoreError(error, OperationType.LIST, boardsPath);
+        handleFirestoreError(error, OperationType.GET, 'user_documents');
       }
     );
 
     return () => {
-      unsubscribeBoards();
+      unsubscribe();
     };
-  }, [user, activeBoardId, teamSessions.map((s) => s.code).join(',')]);
+  }, [user, mergeTaskLists, recoverOldFirestoreTasks, ensureBoardTasksExist]);
 
-  // Sync tasks for current active board from Firestore (Shared for Team Board, Personal for private)
+  // Debounced auto-save to the single document in Firestore
   useEffect(() => {
-    if (!user || !activeBoardId) return;
-
-    setSyncStatus('syncing');
-    const tasksPath = `boards/${activeBoardId}/tasks`;
-    const activeBoardObj = boards.find(b => b.id === activeBoardId);
-    const isTeamBoard = !!activeBoardObj?.teamSessionCode;
-
-    // For team boards, query all tasks without filtering ownerId so all team members see them
-    const tasksQuery = isTeamBoard
-      ? query(collection(db, tasksPath))
-      : query(collection(db, tasksPath), where('ownerId', '==', user.uid));
-
-    const unsubscribeTasks = onSnapshot(
-      tasksQuery,
-      (snapshot) => {
-        const cloudTasks: Task[] = [];
-        snapshot.forEach((docSnap) => {
-          cloudTasks.push({ id: docSnap.id, ...docSnap.data() } as Task);
-        });
-
-        setAllTasks((prev) => {
-          // Merge tasks: keep tasks from other boards, replace active board tasks with cloud tasks
-          const otherBoardTasks = prev.filter((t) => t.boardId !== activeBoardId);
-          return [...otherBoardTasks, ...cloudTasks];
-        });
-
-        setSyncStatus('synced');
-        setLastSyncTime(new Date());
-      },
-      (error) => {
-        setSyncStatus('offline');
-        handleFirestoreError(error, OperationType.LIST, tasksPath);
-      }
-    );
-
-    return () => {
-      unsubscribeTasks();
-    };
-  }, [user, activeBoardId, boards]);
+    if (!user) return;
+    const timer = setTimeout(() => {
+      syncDocumentToFirestore();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [user, masterDocTitle, projects, boards, allTasks, boardSortPreference, syncDocumentToFirestore]);
 
   // Derived state
   const activeBoard = useMemo(() => {
@@ -823,86 +1047,75 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       teamSessionCode: teamSessionCode?.trim() || undefined,
     };
 
-    setBoards((prev) => [...prev, newBoard]);
+    let nextBoards: BoardDocument[] = [];
+    setBoards((prev) => {
+      nextBoards = [...prev, newBoard];
+      safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(nextBoards));
+      return nextBoards;
+    });
     setActiveBoardIdState(newId);
-
-    if (user) {
-      try {
-        setSyncStatus('syncing');
-        await setDoc(doc(db, 'boards', newId), cleanFirestoreData(newBoard));
-        setSyncStatus('synced');
-      } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, `boards/${newId}`);
-      }
+    if (user && nextBoards.length > 0) {
+      syncDocumentToFirestore(undefined, undefined, nextBoards);
     }
-
-    showNotification(`Nouveau document créé : "${title}"`);
+    showNotification(`Nouveau projet créé : "${title}"`);
     return newId;
   };
 
   const updateBoard = async (boardId: string, updates: Partial<BoardDocument>) => {
-    setBoards((prev) =>
-      prev.map((b) => (b.id === boardId ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b))
-    );
-
-    if (user) {
-      try {
-        setSyncStatus('syncing');
-        const boardRef = doc(db, 'boards', boardId);
-        await setDoc(boardRef, cleanFirestoreData({ ...updates, updatedAt: new Date().toISOString() }), { merge: true });
-        setSyncStatus('synced');
-      } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `boards/${boardId}`);
-      }
+    let nextBoards: BoardDocument[] = [];
+    setBoards((prev) => {
+      nextBoards = prev.map((b) => (b.id === boardId ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b));
+      safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(nextBoards));
+      return nextBoards;
+    });
+    if (user && nextBoards.length > 0) {
+      syncDocumentToFirestore(undefined, undefined, nextBoards);
     }
   };
 
   const deleteBoard = async (boardId: string) => {
     if (boards.length <= 1) {
-      showNotification('Impossible de supprimer le dernier document.');
+      showNotification('Impossible de supprimer le dernier projet.');
       return;
     }
 
     const boardToDelete = boards.find((b) => b.id === boardId);
-    const remainingBoards = boards.filter((b) => b.id !== boardId);
-    setBoards(remainingBoards);
+    let remainingBoards: BoardDocument[] = [];
+    setBoards((prev) => {
+      remainingBoards = prev.filter((b) => b.id !== boardId);
+      safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(remainingBoards));
+      return remainingBoards;
+    });
     setAllTasks((prev) => prev.filter((t) => t.boardId !== boardId));
+
+    if (user && remainingBoards.length > 0) {
+      syncDocumentToFirestore(undefined, undefined, remainingBoards);
+    }
 
     if (activeBoardId === boardId) {
       setActiveBoardIdState(remainingBoards[0].id);
     }
 
-    if (user) {
-      try {
-        setSyncStatus('syncing');
-        await deleteDoc(doc(db, 'boards', boardId));
-        setSyncStatus('synced');
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `boards/${boardId}`);
-      }
-    }
-
-    showNotification(`Document "${boardToDelete?.title || boardId}" supprimé.`);
+    showNotification(`Projet "${boardToDelete?.title || boardId}" supprimé.`);
   };
 
-  // Export board as .taskflow file (JSON)
-  const exportBoardToFile = (boardId: string) => {
-    const targetBoard = boards.find((b) => b.id === boardId);
-    if (!targetBoard) return;
-
-    const boardTasks = allTasks.filter((t) => t.boardId === boardId);
+  // Export the entire Unified Document as a single .taskflow file
+  const exportDocumentToFile = () => {
     const exportData = {
       app: 'TaskFlow Windows',
-      version: '1.0',
+      version: '1.5.2',
+      documentType: 'unified_document',
       exportDate: new Date().toISOString(),
-      board: targetBoard,
-      tasks: boardTasks,
+      title: masterDocTitle,
+      categories: projects,
+      boards: boards,
+      tasks: allTasks,
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const safeTitle = targetBoard.title.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+    const safeTitle = masterDocTitle.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
     link.href = url;
     link.download = `${safeTitle}.taskflow`;
     document.body.appendChild(link);
@@ -910,57 +1123,80 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    showNotification(`Fichier "${targetBoard.title}.taskflow" téléchargé avec succès.`);
+    showNotification(`Document complet "${masterDocTitle}.taskflow" téléchargé avec succès.`);
   };
 
-  // Import board from .taskflow or .json file
+  const exportBoardToFile = (_boardId?: string) => {
+    exportDocumentToFile();
+  };
+
+  // Import document from .taskflow or .json file
   const importBoardFromFile = async (file: File): Promise<boolean> => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
 
-      if (!data.board || !data.board.title) {
-        showNotification('Format de fichier invalide. Document TaskFlow attendu.');
-        return false;
-      }
+      if (data.documentType === 'unified_document' || (Array.isArray(data.boards) && data.boards.length > 0)) {
+        const importedTitle = data.title || 'Document Importé';
+        const importedCategories = Array.isArray(data.categories) && data.categories.length > 0 ? data.categories : ['Général'];
+        const importedBoards = Array.isArray(data.boards) ? data.boards : [];
+        const importedTasks = Array.isArray(data.tasks) ? data.tasks : [];
 
-      const importedBoardId = `board_imported_${Date.now()}`;
-      const newBoard: BoardDocument = {
-        ...data.board,
-        id: importedBoardId,
-        title: `${data.board.title} (Importé)`,
-        ownerId: user ? user.uid : 'local-user',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isCloud: !!user,
-      };
-
-      const importedTasks: Task[] = Array.isArray(data.tasks)
-        ? data.tasks.map((t: Task, idx: number) => ({
-            ...t,
-            id: `task_imported_${Date.now()}_${idx}`,
-            boardId: importedBoardId,
-            ownerId: user ? user.uid : 'local-user',
-            createdAt: t.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }))
-        : [];
-
-      setBoards((prev) => [...prev, newBoard]);
-      setAllTasks((prev) => [...prev, ...importedTasks]);
-      setActiveBoardIdState(importedBoardId);
-
-      if (user) {
-        setSyncStatus('syncing');
-        await setDoc(doc(db, 'boards', importedBoardId), cleanFirestoreData(newBoard));
-        for (const t of importedTasks) {
-          await setDoc(doc(db, `boards/${importedBoardId}/tasks`, t.id), cleanFirestoreData(t));
+        setMasterDocTitle(importedTitle);
+        setProjects(importedCategories);
+        setBoards(importedBoards);
+        if (importedBoards.length > 0) {
+          setActiveBoardIdState(importedBoards[0].id);
         }
-        setSyncStatus('synced');
+        setAllTasks(importedTasks);
+
+        if (user) {
+          syncDocumentToFirestore(importedTitle, importedCategories, importedBoards, importedTasks);
+        }
+
+        showNotification(`Document complet "${importedTitle}" importé avec ${importedCategories.length} catégories, ${importedBoards.length} projets et ${importedTasks.length} tâches.`);
+        return true;
       }
 
-      showNotification(`Document "${newBoard.title}" importé avec ${importedTasks.length} tâches.`);
-      return true;
+      if (data.board && data.board.title) {
+        const importedBoardId = `board_imported_${Date.now()}`;
+        const newBoard: BoardDocument = {
+          ...data.board,
+          id: importedBoardId,
+          title: `${data.board.title} (Importé)`,
+          ownerId: user ? user.uid : 'local-user',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isCloud: !!user,
+        };
+
+        const importedTasks: Task[] = Array.isArray(data.tasks)
+          ? data.tasks.map((t: Task, idx: number) => ({
+              ...t,
+              id: `task_imported_${Date.now()}_${idx}`,
+              boardId: importedBoardId,
+              ownerId: user ? user.uid : 'local-user',
+              createdAt: t.createdAt || new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }))
+          : [];
+
+        const updatedBoards = [...boards, newBoard];
+        const updatedTasks = [...allTasks, ...importedTasks];
+        setBoards(updatedBoards);
+        setAllTasks(updatedTasks);
+        setActiveBoardIdState(importedBoardId);
+
+        if (user) {
+          syncDocumentToFirestore(undefined, undefined, updatedBoards, updatedTasks);
+        }
+
+        showNotification(`Projet "${newBoard.title}" ajouté au document avec ${importedTasks.length} tâches.`);
+        return true;
+      }
+
+      showNotification('Format de fichier invalide. Document TaskFlow attendu.');
+      return false;
     } catch (e) {
       console.error('Import error', e);
       showNotification("Erreur lors de l'importation du fichier.");
@@ -968,29 +1204,61 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const createNewDocument = (title?: string) => {
+    const docTitle = title?.trim() || 'Nouveau Document';
+    const initialBoardId = `board_${Date.now()}`;
+    const newBoard: BoardDocument = {
+      id: initialBoardId,
+      title: 'Projet Principal',
+      description: 'Espace de travail',
+      icon: 'folder',
+      color: '#007AFF',
+      ownerId: user ? user.uid : 'local-user',
+      projectName: 'Projets',
+      order: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setMasterDocTitleState(docTitle);
+    safeLocalStorageSet(LOCAL_STORAGE_MASTER_DOC_TITLE_KEY, docTitle);
+    setProjects(['Projets']);
+    setBoards([newBoard]);
+    setAllTasks([]);
+    setActiveBoardIdState(initialBoardId);
+
+    if (user) {
+      syncDocumentToFirestore(docTitle, ['Projets'], [newBoard], []);
+    }
+
+    showNotification(`Nouveau document "${docTitle}" initialisé !`);
+  };
+
   const saveCurrentDocument = async () => {
     try {
       safeLocalStorageSet(LOCAL_STORAGE_BOARDS_KEY, JSON.stringify(boards));
       safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(allTasks));
+      safeLocalStorageSet(LOCAL_STORAGE_PROJECTS_KEY, JSON.stringify(projects));
+      safeLocalStorageSet(LOCAL_STORAGE_MASTER_DOC_TITLE_KEY, masterDocTitle);
 
-      if (user && activeBoard) {
+      if (user) {
         setSyncStatus('syncing');
-        await setDoc(doc(db, 'boards', activeBoard.id), cleanFirestoreData({
-          ...activeBoard,
+        await setDoc(doc(db, 'user_documents', user.uid), cleanFirestoreData({
+          id: user.uid,
           ownerId: user.uid,
-          isCloud: true,
+          title: masterDocTitle,
+          categories: projects,
+          boards: boards.map(b => ({ ...b, ownerId: user.uid, isCloud: true })),
+          tasks: allTasks.map(t => ({ ...t, ownerId: user.uid })),
+          boardSortPreference,
           updatedAt: new Date().toISOString(),
+          version: '1.5.2'
         }), { merge: true });
-
-        const boardTasks = allTasks.filter((t) => t.boardId === activeBoard.id);
-        for (const task of boardTasks) {
-          await setDoc(doc(db, `boards/${activeBoard.id}/tasks`, task.id), cleanFirestoreData(task), { merge: true });
-        }
         setSyncStatus('synced');
       }
 
       setLastSyncTime(new Date());
-      showNotification(`Document "${activeBoard?.title || 'Actif'}" enregistré avec succès !`);
+      showNotification(`Document complet "${masterDocTitle}" (${projects.length} catégories, ${boards.length} projets, ${allTasks.length} tâches) enregistré dans le Cloud en 1 seul document !`);
     } catch (err: any) {
       console.error('Save error:', err);
       showNotification('Erreur lors de l’enregistrement.');
@@ -1088,21 +1356,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActiveBoardIdState(primaryBoardId);
     }
 
-    if (user) {
-      try {
-        setSyncStatus('syncing');
-        for (const b of newBoards) {
-          await setDoc(doc(db, 'boards', b.id), cleanFirestoreData(b));
-        }
-        for (const t of newTasks) {
-          await setDoc(doc(db, 'tasks', t.id), cleanFirestoreData(t));
-        }
-        setSyncStatus('synced');
-      } catch (err) {
-        console.warn('Error syncing template to firestore:', err);
-      }
-    }
-
     showNotification(`Modèle appliqué avec succès : "${template.title}"`);
     return primaryBoardId || activeBoardId;
   };
@@ -1124,26 +1377,15 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
 
-    setAllTasks((prev) => [newTask, ...prev]);
+    let nextTasks: Task[] = [];
+    setAllTasks((prev) => {
+      nextTasks = [newTask, ...prev];
+      safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(nextTasks));
+      return nextTasks;
+    });
 
-    if (user) {
-      try {
-        setSyncStatus('syncing');
-        // Ensure parent board document exists in Firestore
-        const targetBoard = boards.find((b) => b.id === currentBoardId);
-        if (targetBoard) {
-          await setDoc(doc(db, 'boards', currentBoardId), cleanFirestoreData({
-            ...targetBoard,
-            ownerId: user.uid,
-            isCloud: true,
-            updatedAt: new Date().toISOString()
-          }), { merge: true });
-        }
-        await setDoc(doc(db, `boards/${currentBoardId}/tasks`, taskId), cleanFirestoreData(newTask));
-        setSyncStatus('synced');
-      } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, `boards/${currentBoardId}/tasks/${taskId}`);
-      }
+    if (user && nextTasks.length > 0) {
+      syncDocumentToFirestore(undefined, undefined, undefined, nextTasks);
     }
 
     showNotification(`Tâche ajoutée : "${newTask.title}"`);
@@ -1151,43 +1393,38 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    const targetTask = allTasks.find((t) => t.id === taskId);
-    if (!targetTask) return;
+    const now = new Date().toISOString();
+    let nextTasks: Task[] = [];
+    setAllTasks((prev) => {
+      const targetTask = prev.find((t) => t.id === taskId);
+      if (!targetTask) return prev;
+      const updatedTask: Task = {
+        ...targetTask,
+        ...updates,
+        updatedAt: now,
+      };
+      nextTasks = prev.map((t) => (t.id === taskId ? updatedTask : t));
+      safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(nextTasks));
+      return nextTasks;
+    });
 
-    const updatedTask: Task = {
-      ...targetTask,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-
-    setAllTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
-
-    if (user) {
-      try {
-        setSyncStatus('syncing');
-        const taskRef = doc(db, `boards/${targetTask.boardId}/tasks`, taskId);
-        await setDoc(taskRef, cleanFirestoreData(updatedTask), { merge: true });
-        setSyncStatus('synced');
-      } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `boards/${targetTask.boardId}/tasks/${taskId}`);
-      }
+    if (user && nextTasks.length > 0) {
+      syncDocumentToFirestore(undefined, undefined, undefined, nextTasks);
     }
   };
 
   const deleteTask = async (taskId: string) => {
-    const targetTask = allTasks.find((t) => t.id === taskId);
-    if (!targetTask) return;
-
-    setAllTasks((prev) => prev.filter((t) => t.id !== taskId));
+    let nextTasks: Task[] = [];
+    setAllTasks((prev) => {
+      const targetTask = prev.find((t) => t.id === taskId);
+      if (!targetTask) return prev;
+      nextTasks = prev.filter((t) => t.id !== taskId);
+      safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(nextTasks));
+      return nextTasks;
+    });
 
     if (user) {
-      try {
-        setSyncStatus('syncing');
-        await deleteDoc(doc(db, `boards/${targetTask.boardId}/tasks`, taskId));
-        setSyncStatus('synced');
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `boards/${targetTask.boardId}/tasks/${taskId}`);
-      }
+      syncDocumentToFirestore(undefined, undefined, undefined, nextTasks);
     }
 
     showNotification('Tâche supprimée.');
@@ -1211,16 +1448,15 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
     };
 
-    setAllTasks((prev) => [duplicated, ...prev]);
+    let nextTasks: Task[] = [];
+    setAllTasks((prev) => {
+      nextTasks = [duplicated, ...prev];
+      safeLocalStorageSet(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(nextTasks));
+      return nextTasks;
+    });
 
-    if (user) {
-      try {
-        setSyncStatus('syncing');
-        await setDoc(doc(db, `boards/${duplicated.boardId}/tasks`, newTaskId), duplicated);
-        setSyncStatus('synced');
-      } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, `boards/${duplicated.boardId}/tasks/${newTaskId}`);
-      }
+    if (user && nextTasks.length > 0) {
+      syncDocumentToFirestore(undefined, undefined, undefined, nextTasks);
     }
 
     showNotification(`Tâche dupliquée : "${duplicated.title}"`);
@@ -1360,6 +1596,10 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSelectedTag,
         selectedPriority,
         setSelectedPriority,
+        masterDocTitle,
+        setMasterDocTitle,
+        createNewDocument,
+        exportDocumentToFile,
         setActiveBoardId,
         createBoard,
         updateBoard,

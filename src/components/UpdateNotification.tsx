@@ -74,7 +74,7 @@ export const UpdateNotification: React.FC = () => {
     const handleTestUpdate = (e: any) => {
       const detail = e.detail || {
         status: 'available',
-        version: '1.5.0',
+        version: '1.5.2',
         releaseDate: new Date().toISOString(),
       };
       setUpdateInfo(detail);

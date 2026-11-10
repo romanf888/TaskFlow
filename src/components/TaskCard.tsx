@@ -93,13 +93,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       onDragStart={(e) => onDragStart(e, task)}
       onClick={() => onOpenDetails(task)}
       title="Afficher et modifier les détails de la tâche"
-      className={`group relative border ${cardRounded} px-3.5 py-2.5 transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
+      className={`group relative border ${cardRounded} px-3.5 py-2.5 transition-all duration-200 cursor-pointer select-none active:scale-[0.98] ${
         isLiquidGlass
-          ? 'apple-liquid-card border-white/15 hover:border-cyan-400/40 text-slate-100'
+          ? 'apple-liquid-card border-white/15 hover:border-cyan-400/40 text-slate-100 hover:-translate-y-0.5'
           : isLight
-          ? 'bg-white hover:bg-slate-50 border-black/5 hover:border-black/15 shadow-xs hover:shadow-md text-slate-900'
-          : 'bg-[#2c2c2e]/90 hover:bg-[#3a3a3c] border-white/10 hover:border-white/20 shadow-sm hover:shadow-lg text-slate-100'
-      } ${task.status === 'done' ? 'opacity-60' : ''}`}
+          ? 'bg-white hover:bg-slate-50/90 border-slate-200/90 hover:border-[#007AFF]/40 shadow-xs hover:shadow-md text-slate-900 hover:-translate-y-0.5'
+          : 'bg-[#2c2c2e]/90 hover:bg-[#3a3a3c] border-white/10 hover:border-white/20 shadow-sm hover:shadow-lg text-slate-100 hover:-translate-y-0.5'
+      } ${task.status === 'done' ? 'opacity-65' : ''}`}
     >
       {/* Compact Main Row */}
       <div className="flex items-center space-x-2.5">

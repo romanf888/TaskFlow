@@ -720,21 +720,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Section: Documents / Projets Bar */}
+        {/* Section: Documents / Categories Bar */}
         <div className="px-3 pt-1 pb-2 border-b flex items-center justify-between text-[11px] font-bold uppercase tracking-wider">
           <span className="flex items-center space-x-1.5 text-[#4285F4]">
-            <Layers className="w-3.5 h-3.5" />
-            <span>Vos Espaces & Projets</span>
+            <FolderTree className="w-3.5 h-3.5" />
+            <span>Catégories du Document</span>
           </span>
 
           <div className="flex items-center space-x-1">
-            {/* Create Project Button */}
+            {/* Create Category Button */}
             <button
               onClick={() => setIsCreatingProject(!isCreatingProject)}
               className={`p-1 rounded-md transition-colors cursor-pointer ${
                 isLight ? 'hover:bg-slate-200 text-slate-600' : 'hover:bg-white/10 text-slate-400 hover:text-white'
               }`}
-              title="Créer un nouveau projet (Dossier)"
+              title="Créer une nouvelle catégorie dans ce document"
             >
               <FolderPlus className="w-3.5 h-3.5" />
             </button>
@@ -803,8 +803,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="mx-3 mt-1.5 p-2 bg-[#4285F4]/15 border border-[#4285F4]/40 rounded-xl text-[10.5px] text-[#4285F4] text-center animate-pulse flex items-center justify-between">
             <span>
               {draggedBoardId 
-                ? 'Glissez sur un document pour réordonner, ou sur un projet pour le classer'
-                : 'Glissez pour réordonner les sections de projets'}
+                ? 'Glissez sur un document pour réordonner, ou sur une catégorie pour le classer'
+                : 'Glissez pour réordonner les catégories'}
             </span>
             <button 
               onClick={() => {
@@ -818,7 +818,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Inline Create Project Form */}
+        {/* Inline Create Category Form */}
         {isCreatingProject && (
           <form 
             onSubmit={handleCreateProjectSubmit}
@@ -828,11 +828,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="flex items-center space-x-1.5 text-xs font-semibold text-[#4285F4]">
               <FolderPlus className="w-3.5 h-3.5" />
-              <span>Nouveau Projet</span>
+              <span>Nouvelle Catégorie dans ce Document</span>
             </div>
             <input
               type="text"
-              placeholder="Ex: Projet UEFN, Web Client..."
+              placeholder="Ex: Développements, Scolaire, Personnel, Projets..."
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
               className={`w-full border rounded-lg px-2.5 py-1 text-xs outline-none focus:ring-1 focus:ring-[#4285F4] ${
@@ -854,7 +854,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="submit"
                 className="px-3 py-1 bg-[#4285F4] hover:bg-[#3367d6] text-white rounded-md text-[11px] font-semibold cursor-pointer"
               >
-                Créer
+                Créer la catégorie
               </button>
             </div>
           </form>
